@@ -25,10 +25,12 @@ def _visitor_token():
     return tok
 
 
-def _headers(extra=None, bearer=None):
+def _headers(extra=None, bearer=None, owner=None):
     h = {"X-Visitor-Token": _visitor_token()}
     if bearer:
         h["Authorization"] = f"Bearer {bearer}"
+    if owner:
+        h["X-Owner-Token"] = owner
     if extra:
         h.update(extra)
     return h
@@ -60,6 +62,7 @@ def upload(path, bearer=None, collection_id=None, progress=None):
         raise RuntimeError(f"storage.to init failed: {init.get('error')} (http {r.status_code})")
 
     etags = []
+    owner = init.get("owner_token")  # required for owner-only multipart endpoints
     if init.get("type") == "multipart":
         upload_id = init["upload_id"]
         part_size = init.get("part_size", PART_SIZE_FALLBACK)
@@ -72,7 +75,7 @@ def upload(path, bearer=None, collection_id=None, progress=None):
                 chunk = fh.read(part_size)
                 if part_no not in urls:
                     pr = requests.post(f"{BASE}/upload/parts", timeout=30,
-                                       headers=_headers(bearer=bearer),
+                                       headers=_headers(bearer=bearer, owner=owner),
                                        json={"upload_id": upload_id,
                                              "part_numbers": [part_no]})
                     pj = pr.json()
@@ -88,7 +91,7 @@ def upload(path, bearer=None, collection_id=None, progress=None):
                     progress(part_no, total_parts)
 
         cr = requests.post(f"{BASE}/upload/complete-multipart", timeout=30,
-                           headers=_headers(bearer=bearer),
+                           headers=_headers(bearer=bearer, owner=owner),
                            json={"upload_id": upload_id, "parts": etags})
         if not cr.json().get("success"):
             raise RuntimeError(f"complete-multipart failed: {cr.text[:200]}")
@@ -105,8 +108,8 @@ def upload(path, bearer=None, collection_id=None, progress=None):
     payload = {"filename": filename, "size": size, "content_type": ctype, "r2_key": r2_key}
     if collection_id:
         payload["collection_id"] = collection_id
-    cr = requests.post(f"{BASE}/upload/confirm", headers=_headers(bearer=bearer), timeout=30,
-                       json=payload)
+    cr = requests.post(f"{BASE}/upload/confirm", headers=_headers(bearer=bearer, owner=owner),
+                       timeout=30, json=payload)
     cj = cr.json()
     if not cj.get("success"):
         raise RuntimeError(f"confirm failed: {cj.get('error')} (http {cr.status_code})")
