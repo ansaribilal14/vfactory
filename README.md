@@ -1,5 +1,8 @@
 # vfactory — topic → full video, one command
 
+Hosted at **github.com/ansaribilal14/vfactory** (rehosted after the
+superz1402 suspension; see AGENT.md for the full operating contract).
+
 Send a topic. Get a finished video — research, script, narration, visuals,
 score, render, delivery. Fully autonomous.
 
@@ -7,10 +10,11 @@ score, render, delivery. Fully autonomous.
 python3 vfactory.py "Ahyeon BABYMONSTER main vocalist journey" --style documentary
 ```
 
-→ ~60-90s 1080p30 mp4, TTS narration, real sourced images with Ken Burns
-motion, synthesized cinematic score (sidechain-ducked under VO, loudnorm
--14 LUFS), delivered to Telegram (direct ≤48 MB) or storage.to (bigger),
-link pushed to the same chat.
+→ 1080p30 mp4, TTS narration, visuals, synthesized cinematic score
+(sidechain-ducked under VO, loudnorm -14 LUFS), delivered per **Rule 9**:
+main film ALWAYS published as a GitHub Release (1080p + 720p + trailer)
+and the release link pushed to Telegram. storage.to mirrors are extras —
+never the complete delivery.
 
 ## Pipeline
 
@@ -19,10 +23,10 @@ link pushed to the same chat.
 | s1 research | 3-angle web search → deduped source brief | `01_research.json` |
 | s2 script   | LLM documentary plan: hook/body/outro scenes, narration + on-screen text + visual queries. FACT discipline: only sourced facts, thin sources → safe general phrasing | `02_script.json` |
 | s3 voice    | per-scene TTS (voice `tongtong`) + ffprobe timings | `03_voice/`, `03_timings.json` |
-| s4 media    | image-search per scene → download + validate; ffmpeg title-card fallback so render never breaks; optional `--ai-broll` generates scene-1 b-roll | `04_media/`, `04_media.json` |
+| s4 media | REAL footage sourcing (ytdl-agent pool + clip selection, subject-specific, semantically matched to narration); legacy image-search path being rebuilt after sandbox loss | `04_media/`, `04_media.json` |
 | s5 music    | synthesized bed (dark/bright mood) — zero licensing risk | `05_music/bed.wav` |
 | s6 render   | A: per-scene Ken Burns (zoompan, alternating in/out) + captions · B: xfade concat + global fades · C: narration timeline (adelay/amix) + bed sidechain-duck 8:1 + loudnorm → `final.mp4` | `06_final/` |
-| s7 deliver  | ≤48 MB → Telegram sendVideo · bigger → storage.to 3-step upload → link via Telegram | `delivery.json` |
+| s7 deliver  | **Rule 9:** GitHub Release (film-<slug>) + Telegram link + ≤48 MB sendVideo / storage.to mirror | `delivery.json` (release.ok gates `delivered`) |
 
 Every stage checkpoints; a killed run resumes with `--run-dir <dir>`.
 `--rebuild` ignores checkpoints.

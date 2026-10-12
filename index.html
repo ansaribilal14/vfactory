@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vfactory — autonomous documentary studio</title>
+<style>
+  :root{--bg:#0a0c10;--panel:#12151c;--gold:#d4af37;--gold-dim:#8a7a2f;--txt:#e8e6e1;--muted:#8b8f98;--line:#232733}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.6}
+  .hero{text-align:center;padding:110px 24px 70px;background:
+    radial-gradient(ellipse 80% 50% at 50% -10%,rgba(212,175,55,.13),transparent),
+    linear-gradient(180deg,#0d1017 0%,var(--bg) 100%)}
+  .kicker{letter-spacing:.42em;text-transform:uppercase;font-size:.72rem;color:var(--gold);margin-bottom:22px}
+  h1{font-size:clamp(2.2rem,6vw,4rem);font-weight:800;letter-spacing:-.02em}
+  h1 em{font-style:normal;color:var(--gold)}
+  .sub{color:var(--muted);max-width:640px;margin:18px auto 34px;font-size:1.05rem}
+  .badge{display:inline-block;border:1px solid var(--gold-dim);color:var(--gold);
+    padding:8px 22px;border-radius:999px;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase}
+  main{max-width:960px;margin:0 auto;padding:30px 24px 90px}
+  section{margin-top:70px}
+  h2{font-size:.8rem;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);
+    text-align:center;margin-bottom:8px}
+  .h2sub{text-align:center;color:var(--muted);margin-bottom:38px;font-size:.95rem}
+  .film{display:flex;gap:34px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:18px;padding:34px}
+  .frame{flex:0 0 240px;aspect-ratio:16/9;border-radius:10px;border:1px solid var(--gold-dim);
+    background:linear-gradient(135deg,#1a1e29,#0e1118);display:flex;align-items:center;
+    justify-content:center;color:var(--gold);font-size:2.2rem}
+  .film h3{font-size:1.45rem;margin-bottom:8px}
+  .meta{color:var(--muted);font-size:.85rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+  .film p{color:var(--muted);font-size:.95rem}
+  .status{display:inline-block;margin-top:16px;padding:6px 14px;border-radius:6px;
+    background:rgba(212,175,55,.1);border:1px solid var(--gold-dim);color:var(--gold);font-size:.8rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .card b{color:var(--txt)} .card span{color:var(--muted);font-size:.88rem}
+  footer{text-align:center;color:var(--muted);font-size:.8rem;padding:34px;border-top:1px solid var(--line)}
+  footer a{color:var(--gold);text-decoration:none}
+  @media(max-width:700px){.film{flex-direction:column}.frame{flex:none;width:100%}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="kicker">vfactory studio</div>
+  <h1>Documentaries, <em>fully autonomous</em></h1>
+  <p class="sub">Topic in → finished documentary out. Research, script, narration, real footage, score, render, release — one pipeline, zero hands.</p>
+  <span class="badge">Film Library · Release Archive</span>
+</div>
+<main>
+  <section>
+    <h2>Now in production</h2>
+    <p class="h2sub">The next feature currently moving through the pipeline</p>
+    <div class="film">
+      <div class="frame">🎬</div>
+      <div>
+        <h3>BLACKPINK — untitled feature documentary</h3>
+        <div class="meta">In production · 27+ minutes · 1080p</div>
+        <p>Angle selected after transcript-level study of the existing BLACKPINK documentary landscape on YouTube. Will premiere here with 1080p master, 720p and trailer download buttons on release day.</p>
+        <span class="status">● Production started</span>
+      </div>
+    </div>
+  </section>
+  <section>
+    <h2>The pipeline</h2>
+    <p class="h2sub">Seven checkpointed stages, every run resumable, every film released</p>
+    <div class="grid">
+      <div class="card"><b>Research</b><br><span>Multi-angle sourcing with a hard FACT discipline</span></div>
+      <div class="card"><b>Script</b><br><span>Segmented narration, 4000+ words for features</span></div>
+      <div class="card"><b>Voice</b><br><span>TTS narration with word-level timestamps</span></div>
+      <div class="card"><b>Real footage</b><br><span>Subject-specific sourcing — never generic clips</span></div>
+      <div class="card"><b>Score</b><br><span>Synthesized bed, ducked under narration</span></div>
+      <div class="card"><b>Render</b><br><span>1080p30, loudness-normalized master</span></div>
+      <div class="card"><b>Release</b><br><span>GitHub Releases: 1080p + 720p + trailer</span></div>
+      <div class="card"><b>Delivery</b><br><span>Telegram + this page, link always verified</span></div>
+    </div>
+  </section>
+  <section>
+    <h2>Archive</h2>
+    <p class="h2sub">Full version downloads live on the Releases page</p>
+    <div class="film" style="justify-content:center;text-align:center;display:block">
+      <h3>Releases → github.com/ansaribilal14/vfactory</h3>
+      <p>Every finished film ships as a GitHub Release with its 1080p master, 720p encode and trailer as direct downloads.</p>
+      <span class="status">→ <a style="color:inherit;text-decoration:none" href="https://github.com/ansaribilal14/vfactory/releases">Open release archive</a></span>
+    </div>
+  </section>
+</main>
+<footer>vfactory · autonomous documentary studio · <a href="https://github.com/ansaribilal14/vfactory">source</a></footer>
+</body>
+</html>
