@@ -35,6 +35,19 @@ documentary, 27 minutes or more** (R12).
 - R11: **Rule 9 below** — main video always published as a git release.
 - R12: BLACKPINK topic, 27+ minutes, competitor transcript research allowed.
 
+## YouTube sourcing rule (user directive, 2026-10-13 — PERMANENT)
+
+**NEVER use GitHub Actions to download YouTube videos. Not one workflow, not
+one step, not "just for tests".** All YT fetching happens locally on our own
+server/environment via ytdl-agent / yt-dlp. All GitHub-Actions YT-downloader
+workflows were purged from every local clone on 2026-10-13 (re-purge is part
+of tools/restore_env.sh). Non-negotiable.
+
+**Release asset lifecycle (user directive, 2026-10-13):** after the user
+confirms they have downloaded a release's assets, DELETE those assets from
+the release on request. Releases are a delivery vehicle, not permanent
+storage, when the user says so.
+
 ## Rule 9 — Release delivery (mechanical, not optional)
 
 1. s7 ALWAYS calls `publish_release()`: tag `film-<slug>` on
