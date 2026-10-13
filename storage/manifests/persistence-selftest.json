@@ -18,15 +18,15 @@
    "uploaded_at": "2026-10-13T14:35:03+0000",
    "last_verified_at": "2026-10-13T14:35:07+0000",
    "verification_status": "verified",
-   "availability_status": "available",
+   "availability_status": "manual_restore_required",
    "retention_policy": "anonymous: 3 days default, <=7 via expiry_days",
    "expiration_at": "2026-10-16T14:35:03+00:00",
    "generation_stage": "selftest",
    "version": "v1",
    "dependencies": [],
-   "retry_status": null,
+   "retry_status": "storage.to anonymous download is bot-protected; restore via browser manually",
    "notes": ""
   }
  ],
- "updated_at": "2026-10-13T14:35:07+0000"
+ "updated_at": "2026-10-13T14:35:12+0000"
 }
