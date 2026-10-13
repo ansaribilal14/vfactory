@@ -145,10 +145,16 @@ def chunk_of(items, work, name):
         inputs += ["-i", it["path"]]
     # timebase/fps normalization per input — xfade demands identical
     # timebases; lavfi cards (1/15360) vs passthrough mp4 cuts (1/1000000)
-    # otherwise fail with "main timebase do not match"
+    # otherwise fail with "main timebase do not match".
+    # tpad clone-hold covers each scene's cut shortfall (s4 tolerance) so
+    # chunk actuals match the expected timeline — keeps narration sync AND
+    # the 27-minute floor. Holds are masked by the xfade crossfades.
     norms = []
-    for i in range(len(items)):
-        norms.append(f"[{i}:v]settb=AVTB,fps={FPS},format=yuv420p[n{i}]")
+    for i, it in enumerate(items):
+        have = ffprobe_dur_safe(it["path"])
+        gap = max(0.0, round(it["dur"] - have, 3))
+        pad = f",tpad=stop_mode=clone:stop_duration={gap:.3f}" if gap > 0.05 else ""
+        norms.append(f"[{i}:v]settb=AVTB,fps={FPS}{pad},format=yuv420p[n{i}]")
     fc = []
     fc.extend(norms)
     if len(items) == 1:
