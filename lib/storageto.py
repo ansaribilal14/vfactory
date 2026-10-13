@@ -46,6 +46,22 @@ def bandwidth():
     return r.json()
 
 
+def _put_part(url, data, tries=3):
+    """PUT with bounded retry (502/503 blips mid-multipart)."""
+    import time as _t
+    last = None
+    for i in range(tries):
+        try:
+            r = requests.put(url, data=data, timeout=1800)
+            if r.status_code < 400:
+                return r
+            last = RuntimeError(f"PUT {r.status_code}")
+        except Exception as e:
+            last = e
+        _t.sleep(2 + i * 4)
+    raise last
+
+
 def upload(path, bearer=None, collection_id=None, progress=None):
     """Upload a local file. Returns dict {url, id, expires_at, size, storage:'storageto'}.
     Raises RuntimeError on failure."""
@@ -82,7 +98,7 @@ def upload(path, bearer=None, collection_id=None, progress=None):
                     if not pj.get("success"):
                         raise RuntimeError(f"parts URL fetch failed: {pj.get('error')}")
                     urls = {**urls, **{u["partNumber"]: u["url"] for u in pj.get("part_urls", [])}}
-                pr = requests.put(urls[part_no], data=chunk, timeout=600)
+                pr = _put_part(urls[part_no], chunk)
                 if pr.status_code not in (200, 201):
                     raise RuntimeError(f"part {part_no}/{total_parts} PUT failed: {pr.status_code}")
                 etag = pr.headers.get("ETag", "").strip()
@@ -99,7 +115,7 @@ def upload(path, bearer=None, collection_id=None, progress=None):
     else:
         # single presigned PUT
         with open(p, "rb") as fh:
-            pr = requests.put(init["upload_url"], data=fh, timeout=1800)
+            pr = _put_part(init["upload_url"], fh)
         if pr.status_code not in (200, 201):
             raise RuntimeError(f"presigned PUT failed: {pr.status_code}")
         r2_key = init["r2_key"]

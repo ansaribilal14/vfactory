@@ -94,6 +94,7 @@ def run(run_dir, deliver=True, chat_id=None):
     try:
         from lib import persist
         rel = result.get("release") or {}
+        slug = topic.get("slug") or _slug(title)
         if rel.get("ok"):
             url_main = next((u for u in (rel.get("urls") or {}).values() if u), None)
             m = persist.load_manifest(topic.get("slug") or "blackpink-gamble")
