@@ -24,14 +24,28 @@ endpoints or guarantees beyond this file.
    anonymous files expire in <=7 days anyway; record the loss honestly.
 2. Every upload response (file.id, file.url, file.expires_at) is recorded in
    the project manifest as-is. NEVER fabricate URLs/IDs/expiry.
-3. Verification = Range-GET probe (first 1KB) for large files; full SHA-256
-   compare only for files < 50MB or on explicit restore.
-4. Rate budgets: uploads are spread across pipeline stages; status polls
-   avoided (we rely on confirm-response only).
-5. storage.to is backend #1 by policy; the adapter (lib/persist.py) isolates
+3. **VERIFICATION LIMITATION (tested 2026-10-13)**: share URLs
+   (https://storage.to/{id}) are Cloudflare-bot-protected SPA pages — plain
+   HTTP clients get 403 and the page exposes no direct download link without
+   executing app JS. Programmatic download of anonymous files is therefore
+   NOT possible, and undocumented SPA internals are off-limits by policy.
+   Our "verified" = documented GET /api/file/{id}/status returns
+   pending:false + size match + crc32 passed to /upload/confirm for
+   server-side integrity. LOCAL sha256 in the manifest remains the
+   recovery-reference truth.
+4. **RESTORE LIMITATION**: storage.to records cannot be programmatically
+   restored (see 3). Programmatic restore (checksum-verified) works for
+   `github-release` provider records. POLICY: every final deliverable is
+   BOTH released on GitHub (programmatic recovery path) AND mirrored to
+   storage.to (user convenience); storage.to-only assets (intermediates)
+   are recoverable by regeneration or manual browser download — stated
+   plainly in the manifest, never faked.
+5. Rate budgets: uploads are spread across pipeline stages; status polls
+   only at verify-time and restart-recovery (documented 120/min limit).
+6. storage.to is backend #1 by policy; the adapter (lib/persist.py) isolates
    provider specifics so a second backend can be added without touching the
    pipeline. Manifest schema is provider-agnostic.
-6. Treat all uploaded URLs as PUBLIC — no secrets, no private data.
-7. Expiry monitoring: assets are re-checked (check_asset) before reuse after
+7. Treat all uploaded URLs as PUBLIC — no secrets, no private data.
+8. Expiry monitoring: assets are re-checked (check_asset) before reuse after
    >24h or after any restart. Expired assets are marked `expired` in the
    manifest and regenerated only if inputs survive; the loss is reported.

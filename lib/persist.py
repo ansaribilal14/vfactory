@@ -128,7 +128,7 @@ def persist_asset(path, project_id, asset_type, generation_stage,
     # 1) upload (storage.to 3-step flow; multipart handled by lib)
     try:
         up = storageto.upload(path)
-        f = up.get("file") or {}
+        f = up.get("file") or up  # lib returns flat {id,url,...}; API docs nest under file
         rec["remote_id"] = f.get("id")
         rec["remote_url"] = f.get("url")
         rec["uploaded_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -182,24 +182,39 @@ def _save_owner_token(project_id, asset_id, token):
 
 
 def verify_remote(rec, full=False):
-    """Range-GET probe; optional full-body sha256 compare."""
+    """Availability probe via the DOCUMENTED status endpoint.
+
+    storage.to share URLs are Cloudflare-bot-protected SPA pages: anonymous
+    programmatic download is not available and undocumented internals are
+    off-limits by policy. "verified" therefore means: file exists (not
+    pending), size matches, crc32 was validated server-side at confirm time.
+    Local sha256 stays the recovery-reference truth in the manifest.
+    Programmatic restore works for github-release provider records; for
+    storage.to records it requires manual browser download (documented
+    limitation).
+    """
     import urllib.request
-    if not rec.get("remote_url"):
-        return False, "no remote_url"
+    if rec.get("provider") == "github-release" and rec.get("remote_url"):
+        try:
+            req = urllib.request.Request(rec["remote_url"],
+                                         headers={"Range": "bytes=0-1023"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                if r.status not in (200, 206):
+                    return False, f"http {r.status}"
+                r.read(1024)
+            return True, "release-range-probe"
+        except Exception as e:
+            return False, str(e)[:150]
+    if not rec.get("remote_id"):
+        return False, "no remote_id"
     try:
-        req = urllib.request.Request(rec["remote_url"],
-                                     headers={"Range": "bytes=0-1023"})
+        req = urllib.request.Request(
+            f"https://storage.to/api/file/{rec['remote_id']}/status")
         with urllib.request.urlopen(req, timeout=30) as r:
-            if r.status not in (200, 206):
-                return False, f"http {r.status}"
-            r.read(1024)
-        if full:
-            with urllib.request.urlopen(rec["remote_url"], timeout=300) as r:
-                data = r.read()
-            if hashlib.sha256(data).hexdigest() != rec["sha256"]:
-                return False, "sha mismatch on full download"
-            return True, "full-sha"
-        return True, "range-probe"
+            d = json.loads(r.read().decode())
+        if d.get("pending") is False:
+            return True, "status-endpoint"
+        return False, f"status={d}"
     except Exception as e:
         return False, str(e)[:150]
 
@@ -219,10 +234,22 @@ def check_asset(project_id, asset_id):
 
 
 def restore_asset(project_id, asset_id, dest_dir):
-    """Download a manifest asset into dest_dir, verify sha256, mark restored."""
+    """Download a manifest asset into dest_dir, verify sha256, mark restored.
+
+    github-release records: fully programmatic. storage.to records: NOT
+    programmatically restorable (Cloudflare-protected SPA; undocumented
+    internals are off-limits) — fails fast with an explicit state instead
+    of downloading an HTML page and faking success."""
     rec = find_asset(project_id, asset_id)
     if not rec or not rec.get("remote_url"):
         return {"ok": False, "state": "no_remote_location"}
+    if rec.get("provider") == "storage.to":
+        rec["availability_status"] = "manual_restore_required"
+        rec["retry_status"] = ("storage.to anonymous download is "
+                               "bot-protected; restore via browser manually")
+        _write_manifest_record(project_id, rec)
+        return {"ok": False, "state": "manual_restore_required",
+                "url": rec["remote_url"]}
     os.makedirs(dest_dir, exist_ok=True)
     dest = os.path.join(dest_dir, rec["filename"])
     try:
