@@ -6,7 +6,7 @@ Rule 9 (mandatory): the main film is ALWAYS published as a GitHub Release
 the release link is pushed to Telegram. Telegram copies and storage.to
 mirrors are courtesy extras — release.ok gates the `delivered` flag.
 """
-import json, os, re, sys, time
+import json, os, re, subprocess, sys, time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import storageto, telegram, ghrelease  # noqa: E402
@@ -18,23 +18,36 @@ def _slug(text):
 
 
 def publish_release(run_dir, title, topic, chat_id):
-    """Rule 9: tag film-<slug>, upload every version, TG the release link."""
+    """Rule 9: tag film-<slug>, upload every version, TG the release link.
+    R13 lifecycle: assets are TEMPORARY distribution — deleted after the user
+    has downloaded them. Asset names reflect the REAL render resolution."""
     slug = topic.get("slug") or _slug(title)
     tag = f"film-{slug}"
-    named = [(os.path.join(run_dir, "final.mp4"), f"{slug}_full_1080p.mp4")]
+    # honest resolution label from the actual file
+    h = 0
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                            "-show_entries", "stream=height", "-of", "csv=p=0",
+                            os.path.join(run_dir, "final.mp4")],
+                           capture_output=True, text=True)
+        h = int(r.stdout.strip() or 0)
+    except Exception:
+        pass
+    main_name = f"{slug}_full_{h}p.mp4" if h else f"{slug}_full.mp4"
+    named = [(os.path.join(run_dir, "final.mp4"), main_name)]
     for src, dst in (("final_720p.mp4", f"{slug}_full_720p.mp4"),
                      ("trailer.mp4", f"{slug}_trailer.mp4")):
         p = os.path.join(run_dir, src)
-        if os.path.isfile(p):
+        if os.path.isfile(p) and src != "final_720p.mp4":
             named.append((p, dst))
     info = {"tag": tag, "repo": ghrelease._repo(), "assets": {}}
     try:
         html_url, urls, ok_all = ghrelease.publish(
             tag, title, named,
             body=f"{title}\n\nDelivered by vfactory (autonomous documentary pipeline).\n"
-                 f"Versions: 1080p master"
-                 + (", 720p" if len(named) > 1 else "")
-                 + (", trailer" if len(named) > 2 else "") + ".")
+                 f"Master: {h or '?'}p real-footage render.\n"
+                 f"Asset lifecycle: files are removed from this release after "
+                 f"the requester has downloaded them (temporary distribution).")
         info.update({"ok": bool(ok_all), "html_url": html_url, "urls": urls})
         link_msg = (f"🎬 <b>{title}</b> — official release\n"
                     f"⬇️ {html_url}\n"

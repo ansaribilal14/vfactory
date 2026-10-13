@@ -58,9 +58,8 @@ def main():
         ("research", lambda: s1_research.run(run_dir, topic["topic"], topic.get("region", "us"))),
         ("script", lambda: s2_script.run(run_dir, topic["topic"], topic.get("style", "documentary"),
                                          topic.get("scenes", 7), topic.get("region", "us"))),
-        ("voice", lambda: s3_voice.run(run_dir, topic.get("tts_speed", 1.0))),
-        ("media", lambda: s4_media.run(run_dir, topic.get("region", "us"),
-                                       topic.get("ai_broll", False))),
+        ("voice", lambda: s3_voice.run(run_dir)),
+        ("media", lambda: s4_media.run(run_dir)),
     ]
     for name, fn in steps:
         marker = os.path.join(run_dir, f".done_{name}")
@@ -73,26 +72,17 @@ def main():
         open(marker, "w").write("1")
         log(run_dir, f"stage {name} done in {time.time()-t0:.0f}s")
 
-    # timeline -> music -> render
-    tl_path = os.path.join(run_dir, "06_timeline.json")
-    if not os.path.exists(tl_path) or args.rebuild:
-        durs, starts, total = s6_render.scene_durations(run_dir)
-        json.dump({"durations": durs, "starts": starts, "total": total},
-                  open(tl_path, "w"), indent=1)
-        log(run_dir, f"timeline computed ({total:.0f}s)")
-    if not os.path.exists(os.path.join(run_dir, ".done_music")) or args.rebuild:
-        t0 = time.time()
-        tl = json.load(open(tl_path))
-        s5_music.run(run_dir, tl["total"])
-        open(os.path.join(run_dir, ".done_music"), "w").write("1")
-        log(run_dir, f"stage music done in {time.time()-t0:.0f}s")
-    if not os.path.exists(os.path.join(run_dir, "final.mp4")) or args.rebuild:
-        t0 = time.time()
-        info = s6_render.run(run_dir)
-        log(run_dir, f"stage render done in {time.time()-t0:.0f}s "
-                     f"({info['total']:.0f}s video)")
-    else:
-        log(run_dir, "skip render (final.mp4 exists)")
+    # timeline estimate -> music bed at exact length -> render
+    items, _plan = s6_render.build_timeline(run_dir)
+    total_est = round(sum(i["dur"] for i in items), 3)
+    log(run_dir, f"timeline estimated ({total_est:.0f}s incl. cards)")
+    t0 = time.time()
+    s5_music.run(run_dir, total_est)
+    log(run_dir, f"stage music done in {time.time()-t0:.0f}s")
+    t0 = time.time()
+    info = s6_render.run(run_dir)
+    log(run_dir, f"stage render done in {time.time()-t0:.0f}s "
+                 f"({info['total']:.0f}s video)")
 
     size_mb = os.path.getsize(os.path.join(run_dir, "final.mp4")) / 1048576
     log(run_dir, f"final.mp4 ready: {size_mb:.1f} MB")

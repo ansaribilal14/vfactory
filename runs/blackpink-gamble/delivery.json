@@ -1,9 +1,25 @@
 {
- "html_url": "https://github.com/ansaribilal14/vfactory/releases/tag/film-blackpink-gamble-that-changed-kpop",
- "urls": {
-  "blackpink-gamble-that-changed-kpop_full_1080p.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-blackpink-gamble-that-changed-kpop/blackpink-gamble-that-changed-kpop_full_1080p.mp4",
-  "blackpink-gamble-that-changed-kpop_full_720p.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-blackpink-gamble-that-changed-kpop/blackpink-gamble-that-changed-kpop_full_720p.mp4",
-  "blackpink-gamble-that-changed-kpop_trailer.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-blackpink-gamble-that-changed-kpop/blackpink-gamble-that-changed-kpop_trailer.mp4"
+ "file": "runs/blackpink-gamble/final.mp4",
+ "size_mb": 766.2,
+ "chat_id": "1263089875",
+ "release": {
+  "tag": "film-blackpink-gamble-that-changed-kpop",
+  "repo": "ansaribilal14/vfactory",
+  "assets": {},
+  "ok": true,
+  "html_url": "https://github.com/ansaribilal14/vfactory/releases/tag/film-blackpink-gamble-that-changed-kpop",
+  "urls": {
+   "blackpink-gamble-that-changed-kpop_full_720p.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-blackpink-gamble-that-changed-kpop/blackpink-gamble-that-changed-kpop_full_720p.mp4",
+   "blackpink-gamble-that-changed-kpop_trailer.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-blackpink-gamble-that-changed-kpop/blackpink-gamble-that-changed-kpop_trailer.mp4"
+  },
+  "tg_ok": false,
+  "tg_error": "[Errno 2] No such file or directory: '/home/z/my-project/.tg_token'"
  },
- "ok": true
+ "method": "storageto",
+ "ok": true,
+ "url": "https://storage.to/x5y24ajjT",
+ "id": "x5y24ajjT",
+ "expires_at": "2026-10-16T06:01:03+00:00",
+ "tg_error": "[Errno 2] No such file or directory: '/home/z/my-project/.tg_token'",
+ "delivered": true
 }
