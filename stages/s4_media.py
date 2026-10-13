@@ -21,7 +21,7 @@ W, H = 1280, 720
 FPS = 30
 SKIP_HEAD = 8.0     # skip MV intros (logos)
 SKIP_TAIL = 6.0     # skip outros
-MIN_SEG, MAX_SEG = 3.0, 9.0
+MIN_SEG, MAX_SEG = 3.0, 11.5
 GAP = 6.0           # min gap between reused ranges in one source
 
 # extra semantic hints per pool key (filename stem before "_<videoid>")
@@ -206,7 +206,7 @@ def run(run_dir):
         text = " ".join([sc.get("narration", ""), sc.get("visual_query", ""),
                          sc.get("on_screen", ""), sc.get("notes", "")]).lower()
         ranked = sorted(pool, key=lambda k: -score_scene(text, k, pool[k]))
-        nseg = max(2, min(6, round(T / 7)))
+        nseg = max(2, min(8, round(T / 7)))
         picks = pick_ranges(pool, ranked, T, nseg, used, rot)
         cut_scene(pool, picks, T, out)
         dur = ffprobe_dur(out)

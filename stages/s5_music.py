@@ -26,7 +26,7 @@ def run(run_dir, total_dur, mood=None):
             ("sine=frequency=110:duration=%d", 0.42, 0.11, 0.45),
             ("sine=frequency=164.81:duration=%d", 0.34, 0.10, 0.50),
             ("sine=frequency=220.5:duration=%d", 0.30, 0.12, 0.60),
-            ("sine=frequency=329.6:duration=%d", 0.16, 0.09, 0.55),
+            ("sine=frequency=329.6:duration=%d", 0.16, 0.12, 0.55),
         ]
     else:  # bright — C major-ish stack
         layers = [
@@ -34,7 +34,7 @@ def run(run_dir, total_dur, mood=None):
             ("sine=frequency=130.81:duration=%d", 0.40, 0.11, 0.45),
             ("sine=frequency=196.00:duration=%d", 0.32, 0.10, 0.50),
             ("sine=frequency=261.63:duration=%d", 0.28, 0.12, 0.60),
-            ("sine=frequency=392.00:duration=%d", 0.16, 0.09, 0.55),
+            ("sine=frequency=392.00:duration=%d", 0.16, 0.12, 0.55),
         ]
 
     inputs, chains = [], []
@@ -53,7 +53,7 @@ def run(run_dir, total_dur, mood=None):
           f"lowpass=f=1400,aecho=0.7:0.6:311|433:0.25|0.18,"
           f"apulsator=hz=0.08:width=0.6,"
           f"afade=t=in:d=4,afade=t=out:st={max(dur - 6, 1)}:d=6,"
-          f"aformat=channel_layouts=stereo[bed]")
+          f"volume=2.8,aformat=channel_layouts=stereo[bed]")
     proc = subprocess.run(["ffmpeg", "-y", "-v", "error"] + inputs +
                           ["-filter_complex", fc, "-map", "[bed]", "-ar", "48000", bed],
                           capture_output=True, timeout=300)

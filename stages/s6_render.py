@@ -143,15 +143,22 @@ def chunk_of(items, work, name):
     inputs = []
     for it in items:
         inputs += ["-i", it["path"]]
+    # timebase/fps normalization per input — xfade demands identical
+    # timebases; lavfi cards (1/15360) vs passthrough mp4 cuts (1/1000000)
+    # otherwise fail with "main timebase do not match"
+    norms = []
+    for i in range(len(items)):
+        norms.append(f"[{i}:v]settb=AVTB,fps={FPS},format=yuv420p[n{i}]")
     fc = []
+    fc.extend(norms)
     if len(items) == 1:
-        fc.append(f"[0:v]format=yuv420p[vout]")
+        fc.append(f"[n0:v]format=yuv420p[vout]")
     else:
-        prev, off = "[0:v]", items[0]["dur"] - XF
+        prev, off = "[n0]", items[0]["dur"] - XF
         for i in range(1, len(items)):
             trans = "fadeblack" if items[i - 1]["kind"] in ("card", "endcard") or items[i]["kind"] in ("card", "endcard") else "fade"
             lbl = f"[vx{i}]"
-            fc.append(f"{prev}[{i}:v]xfade=transition={trans}:duration={XF}"
+            fc.append(f"{prev}[n{i}]xfade=transition={trans}:duration={XF}"
                       f":offset={off:.3f}{lbl}")
             prev = lbl
             off += items[i]["dur"] - XF
