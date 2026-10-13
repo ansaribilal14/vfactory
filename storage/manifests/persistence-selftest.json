@@ -18,15 +18,15 @@
    "uploaded_at": "2026-10-13T14:32:36+0000",
    "last_verified_at": "2026-10-13T14:32:38+0000",
    "verification_status": "uploaded_unverified",
-   "availability_status": "unavailable",
+   "availability_status": "restore_failed",
    "retention_policy": "anonymous: 3 days default, <=7 via expiry_days",
    "expiration_at": "2026-10-16T14:32:36+00:00",
    "generation_stage": "selftest",
    "version": "v1",
    "dependencies": [],
-   "retry_status": "check: HTTP Error 403: Forbidden",
+   "retry_status": "HTTP Error 403: Forbidden",
    "notes": ""
   }
  ],
- "updated_at": "2026-10-13T14:32:38+0000"
+ "updated_at": "2026-10-13T14:32:40+0000"
 }
