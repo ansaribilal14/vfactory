@@ -240,6 +240,11 @@ def pass_b(items, run_dir):
               flush=True)
         # R14: copy-concat dropped ~27s (timebase re-timing alters real chunk
         # lengths vs metas). Concat-filter re-encode rewrites timestamps.
+        with open(concat_script, "w") as fh:
+            fh.write(";".join(f"[{i}:v]" for i in range(len(chunks))) +
+                     f"concat=n={len(chunks)}:v=1:a=0,"
+                     f"fade=t=in:d=0.5,fade=t=out:st={max(total-0.9,0):.3f}:d=0.9,"
+                     f"format=yuv420p[vout]")
         sh(["ffmpeg", "-y", "-v", "error"] + sum([["-i", c] for c in chunks], []) +
            ["-filter_complex_script", concat_script, "-map", "[vout]",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
