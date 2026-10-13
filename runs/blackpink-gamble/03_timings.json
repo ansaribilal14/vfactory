@@ -1,0 +1,263 @@
+{
+ "voice": "en-US-AndrewNeural",
+ "rate": "-15%",
+ "timings": [
+  {
+   "id": 1,
+   "wav": "runs/blackpink-gamble/03_voice/cold_open_s01.wav",
+   "audio": 26.16
+  },
+  {
+   "id": 2,
+   "wav": "runs/blackpink-gamble/03_voice/cold_open_s02.wav",
+   "audio": 21.04
+  },
+  {
+   "id": 3,
+   "wav": "runs/blackpink-gamble/03_voice/ch1_s03.wav",
+   "audio": 32.84
+  },
+  {
+   "id": 4,
+   "wav": "runs/blackpink-gamble/03_voice/ch1_s04.wav",
+   "audio": 27.06
+  },
+  {
+   "id": 5,
+   "wav": "runs/blackpink-gamble/03_voice/ch1_s05.wav",
+   "audio": 32.66
+  },
+  {
+   "id": 6,
+   "wav": "runs/blackpink-gamble/03_voice/ch1_s06.wav",
+   "audio": 31.94
+  },
+  {
+   "id": 7,
+   "wav": "runs/blackpink-gamble/03_voice/ch2_s07.wav",
+   "audio": 33.86
+  },
+  {
+   "id": 8,
+   "wav": "runs/blackpink-gamble/03_voice/ch2_s08.wav",
+   "audio": 41.18
+  },
+  {
+   "id": 9,
+   "wav": "runs/blackpink-gamble/03_voice/ch2_s09.wav",
+   "audio": 39.94
+  },
+  {
+   "id": 10,
+   "wav": "runs/blackpink-gamble/03_voice/ch2_s10.wav",
+   "audio": 28.26
+  },
+  {
+   "id": 11,
+   "wav": "runs/blackpink-gamble/03_voice/ch2_s11.wav",
+   "audio": 26.48
+  },
+  {
+   "id": 12,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s12.wav",
+   "audio": 28.58
+  },
+  {
+   "id": 13,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s13.wav",
+   "audio": 22.2
+  },
+  {
+   "id": 14,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s14.wav",
+   "audio": 41.7
+  },
+  {
+   "id": 15,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s15.wav",
+   "audio": 25.7
+  },
+  {
+   "id": 16,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s16.wav",
+   "audio": 24.08
+  },
+  {
+   "id": 17,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s17.wav",
+   "audio": 34.88
+  },
+  {
+   "id": 18,
+   "wav": "runs/blackpink-gamble/03_voice/ch3_s18.wav",
+   "audio": 30.26
+  },
+  {
+   "id": 19,
+   "wav": "runs/blackpink-gamble/03_voice/ch4_s19.wav",
+   "audio": 28.9
+  },
+  {
+   "id": 20,
+   "wav": "runs/blackpink-gamble/03_voice/ch4_s20.wav",
+   "audio": 36.06
+  },
+  {
+   "id": 21,
+   "wav": "runs/blackpink-gamble/03_voice/ch4_s21.wav",
+   "audio": 29.82
+  },
+  {
+   "id": 22,
+   "wav": "runs/blackpink-gamble/03_voice/ch4_s22.wav",
+   "audio": 33.42
+  },
+  {
+   "id": 23,
+   "wav": "runs/blackpink-gamble/03_voice/ch4_s23.wav",
+   "audio": 20.84
+  },
+  {
+   "id": 24,
+   "wav": "runs/blackpink-gamble/03_voice/ch4_s24.wav",
+   "audio": 34.94
+  },
+  {
+   "id": 25,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s25.wav",
+   "audio": 26.42
+  },
+  {
+   "id": 26,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s26.wav",
+   "audio": 32.42
+  },
+  {
+   "id": 27,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s27.wav",
+   "audio": 33.78
+  },
+  {
+   "id": 28,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s28.wav",
+   "audio": 34.9
+  },
+  {
+   "id": 29,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s29.wav",
+   "audio": 55.82
+  },
+  {
+   "id": 30,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s30.wav",
+   "audio": 49.2
+  },
+  {
+   "id": 31,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s31.wav",
+   "audio": 36.7
+  },
+  {
+   "id": 32,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s32.wav",
+   "audio": 34.16
+  },
+  {
+   "id": 33,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s33.wav",
+   "audio": 33.82
+  },
+  {
+   "id": 34,
+   "wav": "runs/blackpink-gamble/03_voice/ch5_s34.wav",
+   "audio": 25.68
+  },
+  {
+   "id": 35,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s35.wav",
+   "audio": 34.0
+  },
+  {
+   "id": 36,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s36.wav",
+   "audio": 29.1
+  },
+  {
+   "id": 37,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s37.wav",
+   "audio": 35.1
+  },
+  {
+   "id": 38,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s38.wav",
+   "audio": 23.0
+  },
+  {
+   "id": 39,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s39.wav",
+   "audio": 33.46
+  },
+  {
+   "id": 40,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s40.wav",
+   "audio": 26.48
+  },
+  {
+   "id": 41,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s41.wav",
+   "audio": 39.26
+  },
+  {
+   "id": 42,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s42.wav",
+   "audio": 28.34
+  },
+  {
+   "id": 43,
+   "wav": "runs/blackpink-gamble/03_voice/ch6_s43.wav",
+   "audio": 29.46
+  },
+  {
+   "id": 44,
+   "wav": "runs/blackpink-gamble/03_voice/ch7_s44.wav",
+   "audio": 26.62
+  },
+  {
+   "id": 45,
+   "wav": "runs/blackpink-gamble/03_voice/ch7_s45.wav",
+   "audio": 25.88
+  },
+  {
+   "id": 46,
+   "wav": "runs/blackpink-gamble/03_voice/ch7_s46.wav",
+   "audio": 23.04
+  },
+  {
+   "id": 47,
+   "wav": "runs/blackpink-gamble/03_voice/ch7_s47.wav",
+   "audio": 33.22
+  },
+  {
+   "id": 48,
+   "wav": "runs/blackpink-gamble/03_voice/ch7_s48.wav",
+   "audio": 22.88
+  },
+  {
+   "id": 49,
+   "wav": "runs/blackpink-gamble/03_voice/ch7_s49.wav",
+   "audio": 27.28
+  },
+  {
+   "id": 50,
+   "wav": "runs/blackpink-gamble/03_voice/outro_s50.wav",
+   "audio": 30.24
+  },
+  {
+   "id": 51,
+   "wav": "runs/blackpink-gamble/03_voice/outro_s51.wav",
+   "audio": 30.46
+  }
+ ],
+ "narration_total": 1593.52,
+ "source": "recovered-wavs"
+}
