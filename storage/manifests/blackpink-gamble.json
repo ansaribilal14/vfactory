@@ -2,7 +2,7 @@
  "schema_version": 1,
  "project_id": "blackpink-gamble",
  "status": "rebuild-v2-in-progress",
- "updated_at": "2026-10-13T16:00:44+0000",
+ "updated_at": "2026-10-13T19:20:23+0000",
  "assets": [
   {
    "asset_id": "film-blackpink-gamble-v1-720p",
@@ -2496,6 +2496,28 @@
    "dependencies": [],
    "retry_status": null,
    "notes": "multi-cut real footage, no captions"
+  },
+  {
+   "asset_id": "film-blackpink-gamble-v2-720p",
+   "asset_type": "video_final",
+   "filename": "blackpink-the-gamble-that-changed-k-pop-forever_full_720p.mp4",
+   "provider": "github-release",
+   "remote_id": "film-blackpink-the-gamble-that-changed-k-pop-forever",
+   "remote_url": "https://github.com/ansaribilal14/vfactory/releases/download/film-blackpink-the-gamble-that-changed-k-pop-forever/blackpink-the-gamble-that-changed-k-pop-forever_full_720p.mp4",
+   "size_bytes": 1601540546,
+   "sha256": null,
+   "verification_status": "uploaded_unverified",
+   "availability_status": "available",
+   "retention_policy": "release asset (deleted after user download)",
+   "expiration_at": null,
+   "generation_stage": "s6_render",
+   "version": "v2",
+   "dependencies": [
+    "narration-wavs",
+    "scene-cuts (51 persisted on storage.to)"
+   ],
+   "retry_status": "sha pending; audio gates passed (mix mean -15.1dB max -1.5dB; final max -1.2dB)",
+   "notes": "v2: audio rebuilt (51 Andrew narrations + audible bed + loudnorm -14), captions removed, premium cards, 27.16min; 1.6GB = ultrafast crf20 encode at 7.9Mbps; storage.to mirror skipped this round (multipart 502 + 1.6GB exceeds tool window) \u2014 re-mirror on request"
   }
  ]
 }
