@@ -110,3 +110,28 @@ worklog Task 29-era runs.
 - Anonymous storage.to files expire ≤7 days; GitHub Releases are the
   permanent home; local sandbox can RESET WITHOUT WARNING — push early,
   push often.
+
+## R14 — PERMANENT PERSISTENCE PROTOCOL (mandatory, repository-level)
+
+The runtime filesystem is disposable. Git = canonical state; storage.to =
+asset host. Enforced by `lib/persist.py` + `docs/PERSISTENCE_ARCHITECTURE.md`.
+
+1. **Session start (before ANY substantive work)**: fetch + hard-reset to
+   origin/main; read memory/CURRENT_STATE.md, memory/SESSION_HANDOFF.md,
+   memory/PROJECT_REGISTRY.md; load the active project manifest; restore
+   needed assets via persist.restore_asset(); resume from checkpoint. NEVER
+   regenerate a verified asset.
+2. **Asset completion (downloaded OR generated)**: immediately
+   persist_asset() → upload → verify → manifest → git commit+push. No
+   batching until session end. Media NEVER enters git; JSONs/timings DO
+   (commit run-state jsons at each stage).
+3. **Session close**: update memory/*.md, append worklog, commit+push,
+   verify remote sha.
+4. **Releases are per-project and immediate** — a completed project ships
+   without waiting for others. Release ≠ permission to delete.
+5. **Cleanup requires explicit user authorization**; storage.to deletion
+   only via owner token (kept in gitignored .secrets/); every cleanup is
+   recorded in storage/DELETION_LOG.md. If the owner token is lost, say so —
+   anonymous files expire <=7 days regardless.
+6. **Never fabricate** URLs, IDs, checksums, expiries, or test results.
+   If an asset is lost/expired, mark it and report the loss plainly.
