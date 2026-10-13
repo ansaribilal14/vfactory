@@ -43,10 +43,83 @@ def scenes_of(plan):
     return out
 
 
+def canonical_wav_map(plan, existing_files):
+    """Map scene ids -> recovered ch*/outro/cold_open wav filenames.
+
+    Chapter-grouped naming: cold_open_s01/s02 -> 1,2; chN_sXX runs s03..s49;
+    outro_s50/s51 -> 50,51. Strays from chapter-boundary duplication
+    (ch4_s18, ch7_s50, outro_s52) are excluded: the canonical owner of an id
+    is the group whose segment range covers it in the script.
+    """
+    segs = plan.get("segments") or []
+    rng = {}
+    for seg in segs:
+        ids = [s["id"] for s in seg["scenes"]]
+        if ids:
+            rng[seg["id"]] = (min(ids), max(ids))
+    wavmap = {}
+    want = {s["id"] for s in scenes_of(plan)}
+    for f in sorted(existing_files):
+        stem = f[:-4]
+        if "_" not in stem:
+            continue
+        grp, snum = stem.rsplit("_", 1)
+        if not snum.startswith("s") or not snum[1:].isdigit():
+            continue
+        sid = int(snum[1:])
+        if sid not in want:
+            continue                      # orphan (e.g. outro_s52)
+        lo, hi = rng.get(grp, (sid, sid))
+        if not (lo <= sid <= hi):
+            continue                      # boundary stray (e.g. ch4_s18)
+        wavmap.setdefault(sid, f)         # first canonical owner wins
+    return wavmap
+
+
 def run(run_dir):
     out_dir = os.path.join(run_dir, "03_voice")
     os.makedirs(out_dir, exist_ok=True)
     plan = json.load(open(os.path.join(run_dir, "02_script.json")))
+
+    # R14 fast path: the Andrew @ -15% re-narration WAVs survived the sandbox
+    # wipe (git-tracked). Map them canonically instead of re-synthesizing.
+    existing = {f for f in os.listdir(out_dir) if f.endswith(".wav")}
+    if existing and not any(f.startswith("scene_") for f in existing):
+        wavmap = canonical_wav_map(plan, existing)
+        if wavmap and len(wavmap) >= len(scenes_of(plan)):
+            timings = []
+            bad = []
+            for sc in scenes_of(plan):
+                w = wavmap[sc["id"]]
+                p = os.path.join(out_dir, w)
+                # hard audio gate: a silent narration must never ship again
+                r = subprocess.run(["ffmpeg", "-hide_banner", "-i", p, "-af",
+                                    "volumedetect", "-f", "null", "-"],
+                                   capture_output=True, text=True)
+                mx = 0.0
+                for ln in r.stderr.splitlines():
+                    if "max_volume" in ln:
+                        mx = float(ln.split("max_volume:")[1].split("dB")[0])
+                if mx < -40.0:
+                    bad.append((sc["id"], mx))
+                timings.append({"id": sc["id"], "wav": p,
+                                "audio": round(audio_len(p), 2)})
+            if bad:
+                raise RuntimeError(f"SILENT narration detected {bad} — refusing")
+            total = sum(t["audio"] for t in timings)
+            if total < 1500:
+                raise RuntimeError(f"narration total {total:.0f}s < 1500s floor "
+                                   f"— wav mapping suspect")
+            meta = {"voice": VOICE, "rate": os.environ.get("VF_RATE", "-15%"),
+                    "timings": timings, "narration_total": round(total, 2),
+                    "source": "recovered-wavs"}
+            json.dump(meta, open(os.path.join(run_dir, "03_timings.json"), "w"),
+                      indent=1)
+            print(f"voice RECOVERED: {len(timings)} scenes, "
+                  f"narration {total/60:.2f} min (volume gate passed)",
+                  flush=True)
+            return timings
+
     timings, failures = [], []
 
     for sc in scenes_of(plan):

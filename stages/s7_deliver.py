@@ -45,7 +45,10 @@ def publish_release(run_dir, title, topic, chat_id):
         html_url, urls, ok_all = ghrelease.publish(
             tag, title, named,
             body=f"{title}\n\nDelivered by vfactory (autonomous documentary pipeline).\n"
-                 f"Master: {h or '?'}p real-footage render.\n"
+                 f"Master: {h or '?'}p real-footage render, multi-cut editing, "
+                 f"narration + score (loudnorm -14).\n"
+                 f"v2 fixes per user review: on-scene captions removed, "
+                 f"chapter cards redesigned, AUDIO REBUILT (v1 shipped silent).\n"
                  f"Asset lifecycle: files are removed from this release after "
                  f"the requester has downloaded them (temporary distribution).")
         info.update({"ok": bool(ok_all), "html_url": html_url, "urls": urls})
@@ -87,6 +90,43 @@ def run(run_dir, deliver=True, chat_id=None):
     # 1) Rule 9 — GitHub release ALWAYS for the main film
     result["release"] = publish_release(run_dir, title, topic, chat_id)
 
+    # 1b) R14 — persist final deliverable immediately (storage.to + manifest)
+    try:
+        from lib import persist
+        rel = result.get("release") or {}
+        if rel.get("ok"):
+            url_main = next((u for u in (rel.get("urls") or {}).values() if u), None)
+            m = persist.load_manifest(topic.get("slug") or "blackpink-gamble")
+            m["assets"] = [a for a in m["assets"]
+                           if not a["asset_id"].startswith("film-") or
+                           "v2" not in a["asset_id"]]
+            m["assets"].append({
+                "asset_id": f"film-{slug}-v2-720p", "asset_type": "video_final",
+                "filename": f"{slug}_full_720p.mp4", "provider": "github-release",
+                "remote_id": rel.get("tag"), "remote_url": url_main,
+                "size_bytes": size, "sha256": None,
+                "verification_status": "uploaded_unverified",
+                "availability_status": "available",
+                "retention_policy": "release asset (deleted after user download)",
+                "expiration_at": None, "generation_stage": "s6_render",
+                "version": "v2", "dependencies": ["narration-wavs", "mv-pool"],
+                "retry_status": "sha pending (computable from local final.mp4)",
+                "notes": "v2: audio rebuilt, captions removed"})
+            m["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            persist.save_manifest(m["project_id"], m)
+            persist.git_commit_push(
+                [os.path.relpath(persist._manifest_path(m["project_id"]),
+                                 persist.BASE)],
+                f"persist: {m['project_id']}/film-{slug}-v2-720p (release)")
+        up = persist.persist_asset(final, topic.get("slug") or "blackpink-gamble",
+                                   "video_final", "s6_render", version="v2",
+                                   asset_id=f"{slug}-v2-storage-mirror",
+                                   notes="storage.to mirror of v2 final")
+        result["persist"] = {"ok": up.get("ok"), "state": up.get("state"),
+                             "url": (up.get("record") or {}).get("remote_url")}
+    except Exception as pe:
+        result["persist_error"] = str(pe)[:200]
+
     # 2) courtesy copy: <=48 MB direct sendVideo; bigger -> storage.to mirror
     try:
         if size <= telegram.TG_DIRECT_LIMIT:
@@ -96,12 +136,16 @@ def run(run_dir, deliver=True, chat_id=None):
             if not ok:
                 result["error"] = resp.get("description", "sendVideo failed")
         else:
-            up = storageto.upload(final)
-            result.update({"method": "storageto", "ok": True, **{k: up[k] for k in
-                           ("url", "id", "expires_at")}})
+            mirror = (result.get("persist") or {}).get("url")
+            if mirror:                    # R14: reuse persisted mirror — no 2nd upload
+                up = {"url": mirror, "id": None, "expires_at": None}
+            else:
+                up = storageto.upload(final)
+            result.update({"method": "storageto", "ok": True,
+                           **{k: up.get(k) for k in ("url", "id", "expires_at")}})
             msg = (f"<b>{title}</b> — {tl['total']:.0f}s, {mb:.1f} MB\n"
                    f"⬇️ <a href=\"{up['url']}\">{up['url']}</a>\n"
-                   f"(storage.to mirror • valid until {up['expires_at'] or 'expiry'})")
+                   f"(storage.to mirror • valid until {up.get('expires_at') or 'expiry'})")
             try:
                 sent = telegram.send_message(msg, chat_id=chat_id)
                 result["message_id"] = sent.get("result", {}).get("message_id")

@@ -79,10 +79,18 @@ def upload_asset(rel_id, path, name, size):
 
 
 def publish(tag, title, named_files, body=""):
-    """named_files: [(local_path, asset_name), ...] -> (html_url, urls, all_ok)"""
+    """named_files: [(local_path, asset_name), ...] -> (html_url, urls, all_ok)
+    Replace semantics: identical assets are skipped, different-size assets are
+    re-uploaded, and any asset NOT in named_files is deleted (stale-version
+    cleanup) so the release always reflects the current build."""
     rel = ensure_release(tag, title, body)
+    requests.patch(f"{API}/repos/{_repo()}/releases/{rel['id']}",
+                   headers=_hdr(), timeout=30,
+                   json={"name": title, "body": body})
     urls, ok_all = {}, True
+    names = set()
     for path, name in named_files:
+        names.add(name)
         if not (path and os.path.isfile(path)):
             urls[name] = None
             ok_all = False
@@ -90,6 +98,12 @@ def publish(tag, title, named_files, body=""):
         ok, asset = upload_asset(rel["id"], path, name, os.path.getsize(path))
         urls[name] = asset.get("browser_download_url") if ok else None
         ok_all = ok_all and ok
+    r = requests.get(f"{API}/repos/{_repo()}/releases/{rel['id']}/assets?per_page=100",
+                     headers=_hdr(), timeout=30)
+    for a in (r.json() if r.status_code == 200 else []):
+        if a.get("name") not in names:
+            requests.delete(f"{API}/repos/{_repo()}/releases/assets/{a['id']}",
+                            headers=_hdr(), timeout=30)
     return rel.get("html_url"), urls, ok_all
 
 

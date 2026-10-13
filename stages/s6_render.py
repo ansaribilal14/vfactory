@@ -41,20 +41,21 @@ def esc_textfile(run_dir, sc, text):
 
 
 def make_card(out, kicker, title, dur=CARD):
-    """Awards-style chapter card: dark bg, gold rule, kicker, title."""
+    """Premium minimal chapter card: dark radial-lit bg, thin gold frame,
+    letterspaced kicker, clean title. No boxy caption fills."""
     fc = (
-        f"color=c={BG}:s={W}x{H}:d={dur:.2f}:r={FPS},"
-        f"drawbox=x=(w-170)/2:y=300:w=170:h=3:color={GOLD}@0.95:t=fill,"
-        f"drawtext=fontfile={FONT}:text='{kicker}':fontsize=30:fontcolor={GOLD}"
-        f":x=(w-tw)/2:y=336,"
-        f"drawtext=fontfile={FONT}:text='{title}':fontsize=52:fontcolor=white"
-        f":x=(w-tw)/2:y=392,"
-        f"fade=t=in:d=0.4,fade=t=out:st={dur-0.4:.2f}:d=0.4,format=yuv420p"
+        f"drawbox=x=(w-170)/2:y=306:w=170:h=2:color={GOLD}@0.9:t=fill,"
+        f"drawtext=fontfile={FONT}:text='{kicker}':fontsize=26:fontcolor={GOLD}"
+        f":x=(w-tw)/2:y=348,"
+        f"drawtext=fontfile={FONT}:text='{title}':fontsize=54:fontcolor=0xF2F2F0"
+        f":x=(w-tw)/2:y=404,"
+        f"drawbox=x=44:y=40:w={W}-88:h={H}-80:color={GOLD}@0.18:t=2,"
+        f"fade=t=in:d=0.5,fade=t=out:st={dur-0.5:.2f}:d=0.5,format=yuv420p"
     )
-    sh(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c={BG}:s={W}x{H}:d={dur:.2f}:r={FPS}",
-        "-vf", fc.split(",", 1)[1] if fc.startswith("color=") else fc,
-        "-t", f"{dur:.2f}", "-c:v", "libx264", "-preset", "medium", "-crf", "17",
-        "-an", out])
+    sh(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+        "-i", f"color=c={BG}:s={W}x{H}:d={dur:.2f}:r={FPS}",
+        "-vf", fc, "-t", f"{dur:.2f}", "-c:v", "libx264",
+        "-preset", "veryfast", "-crf", "19", "-an", out])
 
 
 def kicker_for(idx):
@@ -87,19 +88,17 @@ def build_timeline(run_dir):
 
 
 def pass_a(run_dir, items, title):
-    """Caption overlays on scene clips + regenerate all cards (resumable)."""
+    """R14: NO on-scene captions (user: stale captions -> not have them at
+    all). Scene cuts from s4 are already 1280x720@30 — passthrough by
+    reference (saves a full re-encode). Cards regenerated (restyled)."""
     work = os.path.join(run_dir, "06_final")
-    v2 = os.path.join(work, ".v2")
-    if not os.path.isdir(work) or not os.path.exists(v2):
-        if os.path.isdir(os.path.join(run_dir, "06_final_old")):
-            shutil.rmtree(os.path.join(run_dir, "06_final_old"), ignore_errors=True)
-        if os.path.isdir(work):
-            shutil.move(work, os.path.join(run_dir, "06_final_old"))
+    v2 = os.path.join(work, ".v3")
+    if os.path.isdir(work) and not os.path.exists(v2):
+        shutil.rmtree(work, ignore_errors=True)
     os.makedirs(work, exist_ok=True)
-    open(v2, "w").write("2")
+    open(v2, "w").write("3")
     clip_dir = os.path.join(work, "clips")
     os.makedirs(clip_dir, exist_ok=True)
-    first_title_done = False
     out_items = []
     for it in items:
         if it["kind"] in ("card", "endcard"):
@@ -110,30 +109,12 @@ def pass_a(run_dir, items, title):
         else:
             sc = it["sc"]
             src = os.path.join(run_dir, "04_media", "scenes", f"scene_{sc['id']:02d}.mp4")
-            out = os.path.join(clip_dir, f"clip_{sc['id']:02d}.mp4")
-            cap = esc_textfile(run_dir, sc, sc.get("on_screen", ""))
-            if not first_title_done:
-                # opening title over the cold-open footage
-                t1 = sanitize_title(title)
-                vf = (f"drawtext=fontfile={FONT}:text='{t1}':fontsize=58:fontcolor=white"
-                      f":borderw=2:bordercolor=black@0.7:box=1:boxcolor=black@0.30"
-                      f":boxborderw=18:x=(w-tw)/2:y=(h-th)/2-70,"
-                      f"drawbox=x=(w-140)/2:y=(h/2)+18:w=140:h=3:color={GOLD}@0.95:t=fill,"
-                      f"drawtext=fontfile={FONT}:textfile={cap}:fontsize=38:fontcolor=white"
-                      f":borderw=2:bordercolor=black@0.6:box=1:boxcolor=black@0.35"
-                      f":boxborderw=14:x=(w-tw)/2:y=(h/2)+64")
-                first_title_done = True
-            else:
-                vf = (f"drawtext=fontfile={FONT}:textfile={cap}:fontsize=40:fontcolor=white"
-                      f":borderw=2:bordercolor=black@0.6:box=1:boxcolor=black@0.35"
-                      f":boxborderw=14:x=(w-tw)/2:y=h-150")
-            dur = it["dur"]
-            if not (os.path.isfile(out) and abs(ffprobe_dur_safe(out) - dur) < 0.6):
-                sh(["ffmpeg", "-y", "-v", "error", "-i", src,
-                    "-vf", f"{vf},format=yuv420p", "-t", f"{dur:.2f}",
-                    "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "17",
-                    "-r", str(FPS), out], timeout=900)
-            it = {**it, "path": out}
+            if not os.path.isfile(src):
+                raise RuntimeError(f"missing scene cut {src} — run s4 first")
+            if abs(ffprobe_dur_safe(src) - it["dur"]) > 1.2:
+                raise RuntimeError(f"scene {sc['id']} duration drift: "
+                                   f"{ffprobe_dur_safe(src)} vs {it['dur']} — re-run s4")
+            it = {**it, "path": src}     # passthrough, zero re-encode
         out_items.append(it)
     return out_items
 
@@ -181,7 +162,7 @@ def chunk_of(items, work, name):
     out = os.path.join(work, f"{name}.mp4")
     sh(["ffmpeg", "-y", "-v", "error"] + inputs +
        ["-filter_complex_script", script, "-map", "[vout]",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-pix_fmt", "yuv420p", "-r", str(FPS), out], timeout=3600)
     total = sum(i["dur"] for i in items) - XF * (len(items) - 1)
     json.dump({"total": round(total, 3)}, open(meta_p, "w"))
@@ -278,8 +259,8 @@ def pass_c(run_dir, starts, total, video):
     inputs = ["-i", bed]
     for t in timings:
         inputs += ["-i", t["wav"]]
-    fc = [f"[0:a]aformat=channel_layouts=stereo,aresample=48000,"
-          f"atrim=0:{total:.2f},apad=whole_dur={total:.2f}[bed]"]
+    fc.append(f"[0:a]aformat=channel_layouts=stereo,aresample=48000,volume=1.6,"
+          f"atrim=0:{total:.2f},apad=whole_dur={total:.2f}[bed]")
     mix_in = ""
     for n, t in enumerate(timings, 1):
         st = starts.get(t["id"], 0.0) + 0.35
@@ -288,8 +269,8 @@ def pass_c(run_dir, starts, total, video):
                   f"adelay={ms}|{ms}[s{n}]")
         mix_in += f"[s{n}]"
     fc.append(f"{mix_in}amix=inputs={len(timings)}:duration=longest:normalize=0[nar]")
-    fc.append("[bed][nar]sidechaincompress=threshold=0.015:ratio=8:attack=40"
-              ":release=700:makeup=1[ducked]")
+    fc.append("[bed][nar]sidechaincompress=threshold=0.03:ratio=4:attack=40"
+              ":release=700:makeup=2[ducked]")
     fc.append("[nar][ducked]amix=inputs=2:duration=longest:normalize=0[mixout]")
     fc.append(f"[mixout]loudnorm=I=-14:TP=-1.5:LRA=11,atrim=0:{total:.2f},"
               f"afade=t=out:st={max(total - 1.0, 0):.2f}:d=1.0[aout]")
@@ -302,6 +283,21 @@ def pass_c(run_dir, starts, total, video):
         sh(["ffmpeg", "-y", "-v", "error"] + inputs +
            ["-filter_complex_script", script, "-map", "[aout]",
             "-ar", "48000", mix_wav], timeout=1800)
+        # HARD AUDIO GATE — the v1 film shipped silent; never again
+        chk = subprocess.run(["ffmpeg", "-hide_banner", "-i", mix_wav, "-t", "300",
+                              "-af", "volumedetect", "-f", "null", "-"],
+                             capture_output=True, text=True)
+        mean = mx = None
+        for ln in chk.stderr.splitlines():
+            if "mean_volume" in ln:
+                mean = float(ln.split("mean_volume:")[1].split("dB")[0])
+            if "max_volume" in ln:
+                mx = float(ln.split("max_volume:")[1].split("dB")[0])
+        print(f"[s6] mix gate: mean={mean}dB max={mx}dB", flush=True)
+        if mx is None or mx < -12.0 or mean is None or mean < -45.0:
+            os.remove(mix_wav)
+            raise RuntimeError(f"AUDIO GATE FAILED: mean={mean} max={mx} — "
+                               f"narration or bed missing from mix")
         open(os.path.join(work, "mix.ok"), "w").write("1")
     final = os.path.join(run_dir, "final.mp4")
     if not (os.path.isfile(final) and ffprobe_dur_safe(final) > total - 3.0):
@@ -309,12 +305,27 @@ def pass_c(run_dir, starts, total, video):
             "-map", "0:v", "-map", "1:a", "-c:v", "copy",
             "-c:a", "aac", "-b:a", "192k", "-shortest",
             "-movflags", "+faststart", final], timeout=900)
+        # FINAL AUDIO GATE on the shipped file itself
+        chk = subprocess.run(["ffmpeg", "-hide_banner", "-i", final, "-map", "0:a",
+                              "-t", "300", "-af", "volumedetect", "-f", "null", "-"],
+                             capture_output=True, text=True)
+        mx = None
+        for ln in chk.stderr.splitlines():
+            if "max_volume" in ln:
+                mx = float(ln.split("max_volume:")[1].split("dB")[0])
+        print(f"[s6] final gate: max={mx}dB", flush=True)
+        if mx is None or mx < -12.0:
+            os.remove(final)
+            raise RuntimeError(f"FINAL AUDIO GATE FAILED: max={mx}dB — mux broken")
     return final
 
 
 def make_trailer(run_dir, starts, total):
-    """55s trailer: hook + 3 chapter peaks + ending, cut from the master."""
+    """55s trailer: hook + 3 chapter peaks + ending, cut from the master.
+    Skippable via VF_NO_TRAILER=1 (speed priority)."""
     trailer = os.path.join(run_dir, "trailer.mp4")
+    if os.environ.get("VF_NO_TRAILER") == "1":
+        return trailer if os.path.isfile(trailer) else None
     if os.path.isfile(trailer) and ffprobe_dur_safe(trailer) > 40:
         return trailer
     plan = json.load(open(os.path.join(run_dir, "02_script.json")))
