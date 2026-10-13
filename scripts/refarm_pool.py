@@ -60,25 +60,35 @@ def download(key, vid):
     if os.path.isfile(out) and os.path.getsize(out) > 1_000_000:
         print(f"  {key}: already downloaded", flush=True)
         return True
-    # proven path: ytagent cobalt ladder on this server
-    for cli in (["python3", "-m", "ytagent", "download", vid],
-                ["ytagent", "download", vid]):
-        try:
-            r = subprocess.run(cli, capture_output=True, text=True,
-                               timeout=540, cwd="/home/z/my-project/agent-tools/ytagent")
-            if r.returncode == 0:
-                moved = _collect(vid, out)
-                if moved:
-                    print(f"  {key}: ytagent ok -> {out}", flush=True)
-                    return True
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            continue
-    print(f"  {key}: ytagent failed — trying yt-dlp direct", flush=True)
-    r = subprocess.run(["yt-dlp", "-f", "bv*[height<=720]+ba/b[height<=720]",
-                        "-o", out, "--no-part", "--no-warnings",
-                        f"https://www.youtube.com/watch?v={vid}"],
-                       capture_output=True, text=True, timeout=540)
-    return os.path.isfile(out) and os.path.getsize(out) > 1_000_000
+    import shutil
+    bare = f"{POOL}/{vid}.mp4"          # raw-id file from an earlier run
+    if os.path.isfile(bare) and os.path.getsize(bare) > 1_000_000:
+        shutil.move(bare, out)
+        print(f"  {key}: renamed existing {vid}.mp4", flush=True)
+        return True
+    # proven path: ytagent cobalt ladder on this server (R13 compliant)
+    env = dict(os.environ, PYTHONPATH="/home/z/my-project/agent-tools/ytagent/src")
+    try:
+        r = subprocess.run(
+            ["python3", "-m", "ytagent.cli", "download", vid,
+             "--out-dir", "/tmp/ytfarm"],
+            capture_output=True, text=True, timeout=540, env=env,
+            cwd="/home/z/my-project/agent-tools/ytagent")
+    except subprocess.TimeoutExpired:
+        r = None
+    # ytagent writes /tmp/ytfarm/<ID>.mp4 (or its own tree) — locate + move
+    import glob, shutil
+    for pat in (f"/tmp/ytfarm/**/*{vid}*.mp4",
+                f"/home/z/my-project/agent-tools/ytagent/**/*{vid}*.mp4",
+                f"/tmp/**/{vid}.mp4"):
+        for c in glob.glob(pat, recursive=True):
+            if os.path.isfile(c) and os.path.getsize(c) > 1_000_000:
+                shutil.move(c, out)
+                print(f"  {key}: ok {os.path.getsize(out)//1048576}MB", flush=True)
+                return True
+    print(f"  {key}: ytagent failed ({(r.stderr[-120:] if r else 'timeout')})",
+          flush=True)
+    return False
 
 
 def _collect(vid, out):
@@ -98,23 +108,33 @@ def _collect(vid, out):
 
 def main():
     os.makedirs(POOL, exist_ok=True)
+    os.makedirs("/tmp/ytfarm", exist_ok=True)
     mf = POOL + "/manifest.json"
     manifest = json.load(open(mf)) if os.path.isfile(mf) else {}
-    for key, q in QUERIES.items():
-        if key in manifest and manifest[key].get("id"):
+    # merge resolved search ids
+    sp = YT + "/search_ids.json"
+    if os.path.isfile(sp):
+        found = json.load(open(sp))
+        for key, hits in found.items():
+            if hits and key not in manifest:
+                manifest[key] = {"id": hits[0]["id"], "title": hits[0]["title"],
+                                 "query": "web-search"}
+    for key, vid in SEED.items():
+        manifest.setdefault(key, {"id": vid, "title": key, "query": "seed"})
+    # dedupe identical ids (first key wins)
+    seen, dedup = {}, {}
+    for key in sorted(manifest):
+        vid = manifest[key]["id"]
+        if vid in seen:
+            print(f"  dedupe: {key} shares {vid} with {seen[vid]} — dropped", flush=True)
             continue
-        vid, title = search_id(q)
-        if not vid and key in SEED:
-            vid, title = SEED[key], q
-        if not vid:
-            print(f"  {key}: SEARCH FAILED — skipping", flush=True)
-            continue
-        manifest[key] = {"id": vid, "title": title, "query": q}
-        json.dump(manifest, open(mf, "w"), indent=1)   # checkpoint each entry
-        print(f"  {key}: {vid} ({title[:40]})", flush=True)
+        seen[vid] = key
+        dedup[key] = manifest[key]
+    manifest = dedup
     json.dump(manifest, open(mf, "w"), indent=1)
+    print(f"manifest: {len(manifest)} keys", flush=True)
     ok = fail = 0
-    for key, meta in manifest.items():
+    for key, meta in sorted(manifest.items()):
         if download(key, meta["id"]):
             ok += 1
         else:
