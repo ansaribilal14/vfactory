@@ -281,8 +281,8 @@ def pass_c(run_dir, starts, total, video):
     inputs = ["-i", bed]
     for t in timings:
         inputs += ["-i", t["wav"]]
-    fc.append(f"[0:a]aformat=channel_layouts=stereo,aresample=48000,volume=1.6,"
-          f"atrim=0:{total:.2f},apad=whole_dur={total:.2f}[bed]")
+    fc = [f"[0:a]aformat=channel_layouts=stereo,aresample=48000,volume=1.6,"
+          f"atrim=0:{total:.2f},apad=whole_dur={total:.2f}[bed]"]
     mix_in = ""
     for n, t in enumerate(timings, 1):
         st = starts.get(t["id"], 0.0) + 0.35
