@@ -6,7 +6,7 @@ Head commit at last write: see `git log -1`
 ## Active projects
 
 ### blackpink-gamble (documentary film, 51 scenes, 27+ min requirement)
-- **Status**: REBUILD-IN-PROGRESS (user verdict on 2026-10-13 release: stale
+- **Status**: v2 DELIVERED — awaiting user download then asset deletion (user verdict on 2026-10-13 release: stale
   captions + NO audible audio → full audio/caption rebuild)
 - **Recovered after sandbox wipe**: 02_script.json + 51 canonical narration
   WAVs (edge-tts en-US-AndrewNeural @ -15%, verified mean -21dB) are

@@ -23,7 +23,6 @@ narration WAVs survived via git.
 **Blockers**: .tg_token missing (user must re-provide); 2-core CPU →
 encodes must fit 10-min tool windows (use veryfast + chunk resume)
 
-**Exact next action**: run `python3 scripts/build_timings.py` then start s4
-pool re-farm.
+**Exact next action**: none — v2 delivered. On user download confirmation: delete release assets (film-blackpink-the-gamble-that-changed-k-pop-forever). If user asks for compact version: transcode crf23 medium.
 
 **Key commit**: see `git log -1` (R14 persistence core + rebuild fixes)
