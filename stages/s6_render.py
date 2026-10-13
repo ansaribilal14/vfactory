@@ -236,13 +236,17 @@ def pass_b(items, run_dir):
                 use = c if 0 < i < len(chunks) - 1 else \
                     os.path.join(work, f"chunk_{i:02d}f.mp4")
                 fh.write(f"file '{os.path.abspath(use)}'\n")
-        print(f"[s6] copy-concat {len(chunks)} chunks -> video.mp4", flush=True)
-        sh(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
-            "-i", lst, "-c", "copy", "-movflags", "+faststart", video],
-           timeout=600)
+        print(f"[s6] concat re-encode (veryfast) {len(chunks)} chunks -> video.mp4",
+              flush=True)
+        # R14: copy-concat dropped ~27s (timebase re-timing alters real chunk
+        # lengths vs metas). Concat-filter re-encode rewrites timestamps.
+        sh(["ffmpeg", "-y", "-v", "error"] + sum([["-i", c] for c in chunks], []) +
+           ["-filter_complex_script", concat_script, "-map", "[vout]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-pix_fmt", "yuv420p", "-r", str(FPS), video], timeout=3400)
         vd = ffprobe_dur_safe(video)
         if vd < total - 5.0 or vd > total + 300:
-            raise RuntimeError(f"concat -c copy bad duration: {vd} vs {total}")
+            raise RuntimeError(f"concat bad duration: {vd} vs {total}")
         json.dump({"total": total}, open(os.path.join(work, "concat.json"), "w"))
 
     starts = {}
