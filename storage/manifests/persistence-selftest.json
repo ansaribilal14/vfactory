@@ -1,0 +1,32 @@
+{
+ "schema_version": 1,
+ "project_id": "persistence-selftest",
+ "status": "active",
+ "assets": [
+  {
+   "asset_id": "selftest-001",
+   "project_id": "persistence-selftest",
+   "asset_type": "test",
+   "filename": "r14_selftest_asset.txt",
+   "mime_type": "text/plain",
+   "size_bytes": 31,
+   "sha256": "a947c9c62d40f3ae8566a0877f80b068a89124263be1fe5d012ea572cb7e9221",
+   "provider": "storage.to",
+   "remote_id": null,
+   "remote_url": null,
+   "created_at": "2026-10-13T14:31:40+0000",
+   "uploaded_at": "2026-10-13T14:31:44+0000",
+   "last_verified_at": "2026-10-13T14:31:44+0000",
+   "verification_status": "uploaded_unverified",
+   "availability_status": "verify_failed",
+   "retention_policy": "anonymous: 3 days default, <=7 via expiry_days",
+   "expiration_at": null,
+   "generation_stage": "selftest",
+   "version": "v1",
+   "dependencies": [],
+   "retry_status": "verify: no remote_url",
+   "notes": ""
+  }
+ ],
+ "updated_at": "2026-10-13T14:31:44+0000"
+}
