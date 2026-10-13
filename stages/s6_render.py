@@ -247,7 +247,7 @@ def pass_b(items, run_dir):
                      f"format=yuv420p[vout]")
         sh(["ffmpeg", "-y", "-v", "error"] + sum([["-i", c] for c in chunks], []) +
            ["-filter_complex_script", concat_script, "-map", "[vout]",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-r", str(FPS), video], timeout=3400)
         vd = ffprobe_dur_safe(video)
         if vd < total - 5.0 or vd > total + 300:
