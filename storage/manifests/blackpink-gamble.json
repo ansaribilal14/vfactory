@@ -2,7 +2,7 @@
  "schema_version": 1,
  "project_id": "blackpink-gamble",
  "status": "rebuild-v2-in-progress",
- "updated_at": "2026-10-13T14:30:00+0800",
+ "updated_at": "2026-10-13T14:35:11+0000",
  "assets": [
   {
    "asset_id": "film-blackpink-gamble-v1-720p",
@@ -19,7 +19,11 @@
    "expiration_at": null,
    "generation_stage": "s6_render",
    "version": "v1",
-   "dependencies": ["02_script.json", "narration-wavs", "mv-pool"],
+   "dependencies": [
+    "02_script.json",
+    "narration-wavs",
+    "mv-pool"
+   ],
    "retry_status": "sha pending full download (766MB); user reported AUDIO SILENT + captions stale -> v2 replaces this asset",
    "notes": "mirror: https://storage.to/x5y24ajjT (expires 2026-10-16); v1 KNOWN DEFECTS: silent audio track, baked stale captions"
   },
@@ -33,14 +37,17 @@
    "size_bytes": 14009773,
    "sha256": "3dc6a19540d7710838cd420ac802b4975f510325a02039504e205c200e541f80",
    "verification_status": "verified",
-   "availability_status": "available",
+   "availability_status": "restored",
    "retention_policy": "github release asset",
    "expiration_at": null,
    "generation_stage": "s6_make_trailer",
    "version": "v1",
-   "dependencies": ["film-blackpink-gamble-v1-720p"],
+   "dependencies": [
+    "film-blackpink-gamble-v1-720p"
+   ],
    "retry_status": null,
-   "notes": "sha256 computed from actual downloaded bytes 2026-10-13"
+   "notes": "sha256 computed from actual downloaded bytes 2026-10-13",
+   "last_verified_at": "2026-10-13T14:35:11+0000"
   }
  ]
 }
