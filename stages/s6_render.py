@@ -11,7 +11,9 @@ Rebuilt after R13 verdict (distortion + slideshow + broken labels):
     TWO-PASS LINEAR loudnorm (opuscar technique; kills the distortion)
   - trailer cut from the finished master
 """
-import json, os, shutil, subprocess, sys
+import json, os, shutil, subprocess, sys, hashlib
+
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -25,6 +27,153 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 GOLD = "0xC9A227"
 BG = "0x0B0E13"
 NUMW = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE"]
+
+# ---- R15: dependency fingerprints (stale-output ban) -----------------------
+# A cached artifact is ONLY valid when the content hash of every upstream
+# input matches the fingerprint recorded at build time. Existence, .ok
+# markers, and durations are NEVER sufficient on their own.
+MIX_FP_VERSION = "s6-mix-v3-voicewise"
+FINAL_FP_VERSION = "s6-final-v3"
+
+
+def sha256_file(path, block=1 << 20):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while True:
+            b = fh.read(block)
+            if not b:
+                break
+            h.update(b)
+    return h.hexdigest()
+
+
+def mix_fingerprint(timings, bed_path, starts, total):
+    """Content hash of every input the mix depends on."""
+    parts = [MIX_FP_VERSION]
+    for t in timings:
+        p = t["wav"]
+        if not os.path.isfile(p):
+            raise RuntimeError(f"narration file missing: {p}")
+        parts.append(f"{t['id']}:{sha256_file(p)}:{t['audio']:.3f}")
+    parts.append(f"bed:{sha256_file(bed_path)}")
+    parts.append("starts:" + json.dumps(
+        {str(k): round(v, 3) for k, v in sorted(starts.items())}, sort_keys=True))
+    parts.append(f"total:{total:.3f}")
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
+
+def load_mix_meta_proof(work, suffix=""):
+    p = os.path.join(work, f"mix{suffix}.meta.json")
+    try:
+        return json.load(open(p))
+    except Exception:
+        return None
+
+
+def load_mix_meta(work):
+    p = os.path.join(work, "mix.meta.json")
+    try:
+        return json.load(open(p))
+    except Exception:
+        return None
+
+
+# ---- R15: voice-presence verification (the gate v1 lacked) -----------------
+# Envelope cross-correlation of the ACTUAL mix against the ACTUAL narration
+# files at their expected offsets. A music-only mix scores noise (~0.1); a
+# mix containing the narration at the right place scores high (~0.6+).
+# Per-scene check => intentional pauses elsewhere are permitted; we only
+# require the scripted narration to be present at its scripted position.
+ENV_HZ = 200
+
+
+def _env(path, t0=0.0, dur=None):
+    cmd = ["ffmpeg", "-v", "error", "-ss", f"{t0:.3f}"]
+    if dur:
+        cmd += ["-t", f"{dur:.3f}"]
+    cmd += ["-i", path, "-ac", "1", "-ar", "16000", "-f", "s16le", "-"]
+    r = subprocess.run(cmd, capture_output=True, timeout=900)
+    x = np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+    w = 16000 // ENV_HZ
+    n = (len(x) // w) * w
+    if n == 0:
+        return np.zeros(1, np.float32)
+    return np.sqrt((x[:n].reshape(-1, w) ** 2).mean(axis=1))
+
+
+def _xcorr(seg, tpl):
+    """Best normalized correlation of template tpl sliding over seg."""
+    seg = seg - seg.mean()
+    tpl = tpl - tpl.mean()
+    nb = len(tpl)
+    denom_t = float(np.linalg.norm(tpl))
+    if denom_t < 1e-9 or len(seg) < nb:
+        return 0.0
+    best = 0.0
+    for lag in range(0, len(seg) - nb + 1, 1):
+        s = seg[lag:lag + nb]
+        d = float(np.linalg.norm(s))
+        if d < 1e-9:
+            continue
+        c = float(np.dot(s, tpl)) / (d * denom_t)
+        if c > best:
+            best = c
+    return best
+
+
+def verify_narration_in_mix(audio_path, timings, starts, total,
+                            corr_min=0.40, sample=None):
+    """Independent narration QC on a MIXED audio file (mix.wav OR final.mp4).
+
+    Returns (ok, report). Fails when a scripted narration segment cannot be
+    found (correlated) at its expected position — this catches music-only
+    mixes, silent narration, and misaligned narration alike. Only the
+    narration positions themselves are checked, so deliberate silence
+    between scenes remains permitted.
+    """
+    ids = [t["id"] for t in timings]
+    if sample:
+        keep = set(ids[::max(1, len(ids) // sample)] + [ids[0], ids[-1]])
+        ids = [i for i in ids if i in keep]
+    tm_by_id = {t["id"]: t for t in timings}
+    report = {"audio": audio_path, "env_hz": ENV_HZ, "corr_min": corr_min,
+              "scenes": [], "verdict": "fail"}
+    ok_all = True
+    for sid in ids:
+        t = tm_by_id[sid]
+        nenv = _env(t["wav"])
+        nd = len(nenv) / ENV_HZ
+        if nd < 1.0:
+            report["scenes"].append({"id": sid, "error": "narration file too short"})
+            ok_all = False
+            continue
+        exp = max(starts.get(sid, 0.0), 0.0) + 0.35
+        lo = max(0.0, exp - 2.0)
+        dur = min((exp - lo) + nd + 4.0, max(total - lo, 1.0))
+        fenv = _env(audio_path, lo, dur)
+        peak = _xcorr(fenv, nenv)
+        entry = {"id": sid, "expected_start": round(exp, 2), "narr_dur": round(nd, 2),
+                 "corr": round(peak, 3), "pass": bool(peak >= corr_min)}
+        report["scenes"].append(entry)
+        if not entry["pass"]:
+            ok_all = False
+    report["verdict"] = "pass" if ok_all else "fail"
+    return ok_all, report
+
+
+def volumedetect(path, tlimit=None):
+    cmd = ["ffmpeg", "-hide_banner", "-i", path]
+    if tlimit:
+        cmd += ["-t", str(tlimit)]
+    cmd += ["-af", "volumedetect", "-f", "null", "-"]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    mean = mx = None
+    for ln in r.stderr.splitlines():
+        if "mean_volume" in ln:
+            mean = float(ln.split("mean_volume:")[1].split("dB")[0])
+        if "max_volume" in ln:
+            mx = float(ln.split("max_volume:")[1].split("dB")[0])
+    return mean, mx
 
 
 def sh(cmd, timeout=1800):
@@ -130,14 +279,17 @@ def ffprobe_dur_safe(path):
         return 0.0
 
 
-def chunk_of(items, work, name):
-    """xfade chain within one segment chunk -> chunk mp4 (resumable)."""
+def chunk_of(items, work, name, deps_fp=None):
+    """xfade chain within one segment chunk -> chunk mp4 (resumable).
+    R15: cache valid only when the recorded upstream fingerprint matches."""
     out = os.path.join(work, f"{name}.mp4")
     meta_p = os.path.join(work, f"{name}.json")
     want = round(sum(i["dur"] for i in items) - XF * (len(items) - 1), 3)
     if os.path.isfile(out) and os.path.isfile(meta_p):
         try:
-            if abs(json.load(open(meta_p))["total"] - want) < 0.2:
+            m = json.load(open(meta_p))
+            if (abs(m["total"] - want) < 0.2
+                    and (deps_fp is None or m.get("deps_fp") == deps_fp)):
                 return out, want
         except Exception:
             pass
@@ -179,7 +331,8 @@ def chunk_of(items, work, name):
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-pix_fmt", "yuv420p", "-r", str(FPS), out], timeout=3600)
     total = sum(i["dur"] for i in items) - XF * (len(items) - 1)
-    json.dump({"total": round(total, 3)}, open(meta_p, "w"))
+    json.dump({"total": round(total, 3), "deps_fp": deps_fp},
+              open(meta_p, "w"))
     return out, round(total, 3)
 
 
@@ -198,9 +351,14 @@ def pass_b(items, run_dir):
     if cur:
         groups.append(cur)
 
+    # R15: one fingerprint over every upstream frame source — any scene-cut
+    # or card change invalidates all chunks, the concat and the bakes.
+    src_fp = hashlib.sha256("|".join(
+        f"{it['path']}:{sha256_file(it['path'])}" for it in items
+        if os.path.isfile(it["path"])).encode()).hexdigest()
     chunks, offsets, acc = [], [], 0.0
     for gi, grp in enumerate(groups):
-        path, local_total = chunk_of(grp, work, f"chunk_{gi:02d}")
+        path, local_total = chunk_of(grp, work, f"chunk_{gi:02d}", deps_fp=src_fp)
         # global start of each scene inside this chunk
         lo = 0.0
         for it in grp:
@@ -213,8 +371,14 @@ def pass_b(items, run_dir):
 
     concat_script = os.path.join(work, "concat.fc")
     video = os.path.join(work, "video.mp4")
-    if not (os.path.isfile(video) and os.path.isfile(os.path.join(work, "concat.json"))
-            and abs(json.load(open(os.path.join(work, "concat.json")))["total"] - total) < 0.5):
+    cmeta = None
+    try:
+        cmeta = json.load(open(os.path.join(work, "concat.json")))
+    except Exception:
+        pass
+    if not (os.path.isfile(video) and cmeta
+            and abs(cmeta["total"] - total) < 0.5
+            and cmeta.get("deps_fp") == src_fp):
         # Livelock fix: the old one-shot medium re-encode of the whole film
         # exceeded every tool window and restarted from zero on each kill.
         # Now: fades baked into first/last chunks (small re-encodes), the
@@ -223,7 +387,11 @@ def pass_b(items, run_dir):
         def bake(src, dst, mode):
             okp = dst + ".ok"
             if os.path.isfile(dst) and os.path.isfile(okp):
-                return
+                try:
+                    if open(okp).read().strip() == src_fp:
+                        return
+                except Exception:
+                    pass
             dur = ffprobe_dur_safe(src)
             vf = "fade=t=in:d=0.5" if mode == "in" else \
                  f"fade=t=out:st={max(dur - 0.9, 0):.3f}:d=0.9"
@@ -233,7 +401,7 @@ def pass_b(items, run_dir):
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                 "-pix_fmt", "yuv420p", "-r", str(FPS),
                 "-movflags", "+faststart", dst], timeout=1800)
-            open(okp, "w").write("1")
+            open(okp, "w").write(src_fp)
             print(f"[s6] bake done", flush=True)
         bake(chunks[0], os.path.join(work, "chunk_00f.mp4"), "in")
         bake(chunks[-1], os.path.join(work, f"chunk_{len(chunks)-1:02d}f.mp4"), "out")
@@ -259,7 +427,8 @@ def pass_b(items, run_dir):
         vd = ffprobe_dur_safe(video)
         if vd < total - 5.0 or vd > total + 300:
             raise RuntimeError(f"concat bad duration: {vd} vs {total}")
-        json.dump({"total": total}, open(os.path.join(work, "concat.json"), "w"))
+        json.dump({"total": total, "deps_fp": src_fp},
+                  open(os.path.join(work, "concat.json"), "w"))
 
     starts = {}
     for sid, st in offsets:
@@ -267,15 +436,21 @@ def pass_b(items, run_dir):
     return video, starts, total
 
 
-def pass_c(run_dir, starts, total, video):
-    """Narration timeline + ducked bed + loudnorm (labels FIXED)."""
-    timings = json.load(open(os.path.join(run_dir, "03_timings.json")))["timings"]
-    bed = None
-    for cand in (os.path.join(run_dir, "05_music", "bed.wav"),
-                 os.path.join(run_dir, "05_audio", "bed.wav")):
-        if os.path.isfile(cand):
-            bed = cand
-            break
+def pass_c(run_dir, starts, total, video, timings=None, bed_path=None,
+           proof=False):
+    """Narration timeline + ducked bed + loudnorm (+ R15 fingerprint gates).
+    proof=True renders proof.mp4 with the same gates but isolated artifact
+    names (never clobbers the real mix/final metadata)."""
+    suffix = "_proof" if proof else ""
+    if timings is None:
+        timings = json.load(open(os.path.join(run_dir, "03_timings.json")))["timings"]
+    bed = bed_path
+    if bed is None:
+        for cand in (os.path.join(run_dir, "05_music", "bed.wav"),
+                     os.path.join(run_dir, "05_audio", "bed.wav")):
+            if os.path.isfile(cand):
+                bed = cand
+                break
     if bed is None:
         raise RuntimeError("no music bed found (run s5 first)")
     work = os.path.join(run_dir, "06_final")
@@ -293,18 +468,34 @@ def pass_c(run_dir, starts, total, video):
                   f":makeup=2,adelay={ms}|{ms}[s{n}]")
         mix_in += f"[s{n}]"
     fc.append(f"{mix_in}amix=inputs={len(timings)}:duration=longest:normalize=0[nar]")
-    fc.append("[bed][nar]sidechaincompress=threshold=0.02:ratio=6:attack=30"
+    # R15 CRITICAL FIX: [nar] feeds BOTH the sidechain key AND the final mix.
+    # A filter label can only be consumed once — the v1 film shipped silent
+    # because the second [nar] reference silently vanished. asplit is MANDATORY.
+    fc.append("[nar]asplit=2[nar_key][nar_mix]")
+    fc.append("[bed][nar_key]sidechaincompress=threshold=0.02:ratio=6:attack=30"
               ":release=600[ducked]")
-    fc.append("[nar][ducked]amix=inputs=2:duration=longest:normalize=0"
+    fc.append("[nar_mix][ducked]amix=inputs=2:duration=longest:normalize=0"
               f",atrim=0:{total:.2f}[araw]")
     script = os.path.join(work, "passc.fc")
     with open(script, "w") as fh:
         fh.write(";".join(fc))
-    mix_wav = os.path.join(work, "mix.wav")
-    mix_raw = os.path.join(work, "mix_raw.wav")
+    mix_wav = os.path.join(work, f"mix{suffix}.wav")
+    mix_raw = os.path.join(work, f"mix_raw{suffix}.wav")
     lim = "alimiter=limit=0.891:attack=5:release=80"
-    if not (os.path.isfile(mix_wav) and os.path.isfile(os.path.join(work, "mix.ok"))):
-        print(f"[s6] audio mix ({len(timings)} narrations + bed, {total:.0f}s)", flush=True)
+
+    # R15: the mix cache is valid ONLY when its recorded fingerprint matches
+    # the CURRENT content hashes of every narration file, the bed, the start
+    # mapping and the code version. mix.ok existence proves nothing.
+    fp = mix_fingerprint(timings, bed, starts, total)
+    meta = load_mix_meta_proof(work, suffix)
+    cache_ok = bool(
+        os.path.isfile(mix_wav) and meta and meta.get("fingerprint") == fp
+        and os.path.isfile(os.path.join(work, f"mix{suffix}.ok")))
+    qc = {"mix_fingerprint": fp, "cache": "hit" if cache_ok else "miss"}
+
+    if not cache_ok:
+        print(f"[s6] audio mix ({len(timings)} narrations + bed, {total:.0f}s)",
+              flush=True)
         sh(["ffmpeg", "-y", "-v", "error"] + inputs +
            ["-filter_complex_script", script, "-map", "[araw]",
             "-ar", "48000", mix_raw], timeout=1800)
@@ -324,16 +515,10 @@ def pass_c(run_dir, starts, total, video):
             "-af", f"{lim},{ln2},afade=t=out:st={max(total - 1.0, 0):.2f}:d=1.0",
             "-ar", "48000", mix_wav], timeout=1800)
         os.remove(mix_raw)
-        # HARD AUDIO GATE — the v1 film shipped silent; never again
-        chk = subprocess.run(["ffmpeg", "-hide_banner", "-i", mix_wav, "-t", "300",
-                              "-af", "volumedetect", "-f", "null", "-"],
-                             capture_output=True, text=True)
-        mean = mx = None
-        for ln in chk.stderr.splitlines():
-            if "mean_volume" in ln:
-                mean = float(ln.split("mean_volume:")[1].split("dB")[0])
-            if "max_volume" in ln:
-                mx = float(ln.split("max_volume:")[1].split("dB")[0])
+        if os.path.exists(os.path.join(work, "mix.ok")):
+            os.remove(os.path.join(work, "mix.ok"))
+        # GATE 1 (necessary, not sufficient): loudness window
+        mean, mx = volumedetect(mix_wav, tlimit=300)
         print(f"[s6] mix gate: mean={mean}dB max={mx}dB", flush=True)
         if mx is None or mx < -12.0 or mean is None or mean < -45.0:
             os.remove(mix_wav)
@@ -342,25 +527,99 @@ def pass_c(run_dir, starts, total, video):
         if mx > -0.7:
             os.remove(mix_wav)
             raise RuntimeError(f"CLIP GATE FAILED: max={mx}dB — distortion ban (R1)")
-        open(os.path.join(work, "mix.ok"), "w").write("1")
-    final = os.path.join(run_dir, "final.mp4")
-    if not (os.path.isfile(final) and ffprobe_dur_safe(final) > total - 3.0):
+        qc["mix_loudness"] = {"mean_db": mean, "max_db": mx}
+        # GATE 2 (the one v1 lacked): is the SCRIPTED NARRATION actually in
+        # the mix, at its scripted position? A loud music-only mix must not
+        # pass. Voice presence is verified per scene against the source files.
+        ok, voicerep = verify_narration_in_mix(mix_wav, timings, starts, total)
+        qc["mix_narration_verification"] = voicerep
+        bad = [s for s in voicerep["scenes"] if not s.get("pass")]
+        print(f"[s6] voice gate: {len(voicerep['scenes']) - len(bad)}/"
+              f"{len(voicerep['scenes'])} scenes verified (min corr "
+              f"{min([s.get('corr', 0) for s in voicerep['scenes']] or [0]):.2f})",
+              flush=True)
+        if not ok:
+            os.remove(mix_wav)
+            json.dump(qc, open(os.path.join(work, f"qc_report{suffix}.json"), "w"), indent=1)
+            raise RuntimeError(
+                f"NARRATION GATE FAILED on mix.wav: {len(bad)} scene(s) missing or "
+                f"misplaced (ids {[b['id'] for b in bad][:6]}...) — music-only or "
+                f"stale mix is a release-blocking failure")
+        open(os.path.join(work, f"mix{suffix}.ok"), "w").write("1")
+        json.dump({"fingerprint": fp, "total": total,
+                   "starts": {str(k): v for k, v in starts.items()}},
+                  open(os.path.join(work, f"mix{suffix}.meta.json"), "w"), indent=1)
+    else:
+        print("[s6] mix cache HIT (fingerprint match)", flush=True)
+        # even on cache hit, the voice gate must hold for THIS build
+        ok, voicerep = verify_narration_in_mix(mix_wav, timings, starts, total)
+        qc["mix_narration_verification"] = voicerep
+        if not ok:
+            os.remove(mix_wav)
+            if os.path.exists(os.path.join(work, "mix.ok")):
+                os.remove(os.path.join(work, "mix.ok"))
+            raise RuntimeError("NARRATION GATE FAILED on cached mix — invalidated")
+
+    final = os.path.join(run_dir, f"final{suffix}.mp4")
+    # R15: final.mp4 cache is valid ONLY if video.mp4 AND mix.wav content
+    # hashes match what the shipped file was built from. Duration alone is
+    # NEVER a reuse condition (that is how the silent v1 shipped).
+    final_fp = None
+    if os.path.isfile(final):
+        final_fp = hashlib.sha256(
+            f"{FINAL_FP_VERSION}|{sha256_file(video)}|{sha256_file(mix_wav)}"
+        .encode()).hexdigest()
+        fmeta = None
+        try:
+            fmeta = json.load(open(os.path.join(run_dir, f"final{suffix}.meta.json")))
+        except Exception:
+            pass
+        mux_ok = bool(fmeta and fmeta.get("fingerprint") == final_fp)
+        qc["final_fingerprint"] = final_fp
+        qc["final_cache"] = "hit" if mux_ok else "miss"
+    else:
+        mux_ok = False
+        qc["final_cache"] = "no-file"
+    if not mux_ok:
+        print("[s6] mux video.mp4 + mix.wav -> final.mp4", flush=True)
         sh(["ffmpeg", "-y", "-v", "error", "-i", video, "-i", mix_wav,
             "-map", "0:v", "-map", "1:a", "-c:v", "copy",
             "-c:a", "aac", "-b:a", "192k", "-shortest",
             "-movflags", "+faststart", final], timeout=900)
-        # FINAL AUDIO GATE on the shipped file itself
-        chk = subprocess.run(["ffmpeg", "-hide_banner", "-i", final, "-map", "0:a",
-                              "-t", "300", "-af", "volumedetect", "-f", "null", "-"],
-                             capture_output=True, text=True)
-        mx = None
-        for ln in chk.stderr.splitlines():
-            if "max_volume" in ln:
-                mx = float(ln.split("max_volume:")[1].split("dB")[0])
-        print(f"[s6] final gate: max={mx}dB", flush=True)
+        mean, mx = volumedetect(final, tlimit=300)
+        print(f"[s6] final gate: mean={mean}dB max={mx}dB", flush=True)
         if mx is None or mx < -12.0:
             os.remove(final)
             raise RuntimeError(f"FINAL AUDIO GATE FAILED: max={mx}dB — mux broken")
+        qc["final_loudness"] = {"mean_db": mean, "max_db": mx}
+        # GATE 3: narration verified on the SHIPPED FILE's audio stream —
+        # beginning, middle and end of the actual deliverable.
+        ok, voicerep = verify_narration_in_mix(final, timings, starts, total)
+        qc["final_narration_verification"] = voicerep
+        if not ok:
+            os.remove(final)
+            json.dump(qc, open(os.path.join(work, f"qc_report{suffix}.json"), "w"), indent=1)
+            raise RuntimeError("NARRATION GATE FAILED on final.mp4 audio stream — "
+                               "mux produced a narration-free deliverable")
+        json.dump({"fingerprint": final_fp,
+                   "video_sha256": sha256_file(video),
+                   "mix_sha256": sha256_file(mix_wav)},
+                  open(os.path.join(run_dir, f"final{suffix}.meta.json"), "w"), indent=1)
+    else:
+        print("[s6] final cache HIT (fingerprint match)", flush=True)
+        # R15: record evidence even on cache hit — the QC report must always
+        # contain the shipped-file narration verification.
+        ok, voicerep = verify_narration_in_mix(final, timings, starts, total)
+        qc["final_narration_verification"] = voicerep
+        if not ok:
+            os.remove(final)
+            json.dump(qc, open(os.path.join(work, f"qc_report{suffix}.json"),
+                               "w"), indent=1)
+            raise RuntimeError("NARRATION GATE FAILED on cached final.mp4 — "
+                               "invalidated")
+        mean, mx = volumedetect(final, tlimit=300)
+        qc["final_loudness"] = {"mean_db": mean, "max_db": mx}
+    json.dump(qc, open(os.path.join(work, f"qc_report{suffix}.json"), "w"), indent=1)
     return final
 
 

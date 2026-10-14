@@ -135,3 +135,45 @@ asset host. Enforced by `lib/persist.py` + `docs/PERSISTENCE_ARCHITECTURE.md`.
    anonymous files expire <=7 days regardless.
 6. **Never fabricate** URLs, IDs, checksums, expiries, or test results.
    If an asset is lost/expired, mark it and report the loss plainly.
+
+---
+
+## R15 — 2026-10-14 amendment (narration + score + editorial overhaul)
+
+User verdict on the v1 Ahyeon film: narration absent, upbeat score, random
+clip lineup. Root causes proven by measurement and code audit:
+
+1. **The silent-mix bug**: the audio filter graph consumed the narration bus
+   (`[nar]`) twice — once as the sidechaincompress key, once in the final
+   amix — WITHOUT `asplit`. The second reference silently produced nothing,
+   so every mix shipped music-only. The volumedetect gate could not catch it
+   (music is loud). FIX: `asplit` is mandatory; the mix is verified by
+   envelope cross-correlation against the actual narration files at their
+   expected offsets (min corr 0.40; music-only scores ~0.09). Gates run on
+   mix.wav AND on the shipped final.mp4 (16/16 scenes, min corr 0.888).
+2. **Stale reuse**: caches never invalidate on input change. FIX: content
+   fingerprints (sha256 of every narration file, bed, starts map, code
+   version) gate mix/final/chunks/bakes. Duration and .ok markers are never
+   sufficient. `final.meta.json` mismatch forces a re-mux (proven in-run).
+3. **Voice fallback removed**: tongtong is BANNED outright (no substitution);
+   failed TTS fails the build. Per-segment validation report
+   (03_voice/validation.json) is release-blocking.
+4. **Score policy**: `stages/s5_music.py` = cinematic-documentary composer
+   (slow harmonic movement, pads + low strings + sparse piano, act intensity
+   curve, silence pockets, NO percussion/plucks/groove). Regression tests
+   ban groove periodicity and hat-band energy.
+5. **Editorial**: `stages/director.py` (PERMANENT Director agent) plans every
+   scene: shot-index (scene-detect + frames) -> vision-verified shot scores
+   (glm-5v) -> EDL with exact in/out timecodes + reasons -> review queue for
+   weak scenes. s4 renders ONLY from the EDL. Keyword rank is a prior, never
+   proof of relevance.
+6. **imgagent exception (amends R1)**: verified still images are allowed ONLY
+   for non-subject contextual entities demanded by the narration (places,
+   institutions) via `lib/imgagent.py` (search -> download -> vision verify
+   -> provenance manifest). Subject footage stays video-only.
+7. **Fact discipline**: narration facts must trace to the research ledger
+   (01_research.json); a hard fact gate cross-checks dates/numbers in
+   scripts/make_script_v2.py. Unverified claims are dropped, not hedged.
+
+Regression tests: tests/test_narration_gates.py (6 cases),
+tests/test_score.py (5 cases). All must pass before any release.

@@ -1,45 +1,87 @@
 #!/usr/bin/env python3
-"""Stage 5: background music — COMPOSED SCORE (technique learned from lemo-opuscar).
+"""Stage 5 (v3): RESTRAINED CINEMATIC DOCUMENTARY SCORE.
 
-Old bug (user: "weird distortion sound in background"): 5 static sine drones
-summed to ~1.4 amplitude then slammed with volume=2.8 -> hard digital
-clipping. Fixed by composing music instead of droning:
+Rebuilt after R15 user verdict: the opuscar pop-engine (kick + hats + 8th-note
+bass + 16th plucks) reads as upbeat/dance — wrong for a serious documentary.
 
-opuscar TECHNIQUE.md rules applied here:
-  - real chord progression (pads) + bass with 2nd/3rd harmonics so it speaks
-    on phone speakers; sub kept low
-  - pad voicings skip notes below MIDI 48; low end ~-3 dB relative to rest
-  - round-robin pluck variants to avoid the machine-gun effect
-  - mix with headroom (peak <= -6 dB, RMS-targeted), NO output gain slam
-  - s6 does voice compression + limiter + two-pass linear loudnorm
-Deterministic: seeded RNG (default_rng(709)); every render identical.
+Design contract (user directive, R15):
+  - sparse, atmospheric, reflective, cinematic
+  - SLOW harmonic movement: one chord per two bars (66 bpm), minor key
+  - soft pads, sustained low textures, sparse piano-like accents only
+  - emotional progression across chapters (section intensity curve), with
+    deliberate near-silence pockets where statements need room to land
+  - BANNED: kick patterns, hats, dance/pop energy, fast plucks, busy
+    arpeggios, pulsing bass grooves, continuous celebratory music, abrupt
+    changes, distortion
+  - mix headroom: RMS ~ -26 dBFS, peak <= -6 dBFS (s6 loudnorms the MIX with
+    voice to -14 LUFS; the bed must sit beneath narration, never lead it)
+Deterministic (seeded RNG). Cache: bed.meta.json carries a fingerprint of
+composer version + sections + duration — ANY change recomposes and thereby
+invalidates every downstream artifact (s6 fingerprints the bed content).
 """
-import json, os, subprocess, sys, wave
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import wave
 
 import numpy as np
 
 SR = 48000
-PROG = {
-    # dark: Am F C G (A minor) — documentary/cinematic minor lift
-    "dark": {
-        "bpm": 88,
-        "pads": [(57, 60, 64), (53, 57, 60), (55, 60, 64), (55, 59, 62)],
-        "bass": [45, 41, 48, 43],          # A2 F2 C3 G2 (>= ~87 Hz fundamentals)
-        "pluck": [(69, 72, 76, 81), (65, 69, 72, 77), (67, 72, 76, 79), (67, 71, 74, 79)],
-        "kick_beats": (0, 2),
-    },
-    # bright: C G Am F — hype/explainer
-    "bright": {
-        "bpm": 100,
-        "pads": [(60, 64, 67), (59, 62, 67), (57, 60, 64), (53, 57, 60)],
-        "bass": [48, 43, 45, 41],          # C3 G2 A2 F2
-        "pluck": [(72, 76, 79, 84), (67, 71, 74, 79), (69, 72, 76, 81), (65, 69, 72, 77)],
-        "kick_beats": (0, 1, 2, 3),
-    },
+COMPOSER_VERSION = "cinematic-documentary-v1"
+SEED = 709
+
+# ---- harmonic material (D minor center; voicings >= MIDI 46) ---------------
+PROGS = {
+    "reflective": [
+        {"root": 38, "voicing": (50, 53, 57, 60, 64)},   # Dm9
+        {"root": 34, "voicing": (46, 50, 53, 57)},       # Bbmaj7
+        {"root": 41, "voicing": (53, 57, 60)},           # F
+        {"root": 36, "voicing": (48, 52, 55, 60)},       # Cadd9
+    ],
+    "building": [
+        {"root": 38, "voicing": (50, 53, 57, 62)},       # Dm
+        {"root": 43, "voicing": (55, 58, 62, 65)},       # Gm7
+        {"root": 34, "voicing": (46, 50, 53, 58)},       # Bb6
+        {"root": 45, "voicing": (57, 61, 64)},           # A (V of Dm)
+    ],
+    "tension": [
+        {"root": 38, "voicing": (50, 53, 57)},           # Dm
+        {"root": 39, "voicing": (51, 55, 58)},           # Eb (neapolitan colour)
+        {"root": 43, "voicing": (55, 58, 62, 65)},       # Gm7
+        {"root": 45, "voicing": (57, 61, 64)},           # A
+    ],
+    "resolve": [
+        {"root": 38, "voicing": (50, 53, 57, 60, 64)},   # Dm9
+        {"root": 34, "voicing": (46, 50, 53, 57)},       # Bbmaj7
+        {"root": 43, "voicing": (55, 58, 62)},           # Gm7
+        {"root": 38, "voicing": (50, 53, 57)},           # Dm (home)
+    ],
 }
-# stem gain plan (peak-safe: worst transient sum ~0.95, RMS far lower)
-G = {"sub": 0.11, "bass": 0.21, "pad": 0.15, "pluck": 0.12,
-     "kick": 0.30, "hat": 0.055, "air": 0.05}
+# per-scene label -> (intensity, mode)
+LABEL_ARC = {
+    "hook": (0.55, "reflective"),
+    "cold_open": (0.55, "reflective"),
+    "early life": (0.42, "reflective"),
+    "background": (0.42, "reflective"),
+    "training days": (0.45, "reflective"),
+    "trainee": (0.45, "reflective"),
+    "multilingual talent": (0.48, "reflective"),
+    "debut anticipation": (0.52, "building"),
+    "debut moment": (0.62, "building"),
+    "record-breaking moment": (0.70, "building"),
+    "international recognition": (0.66, "building"),
+    "commercial success": (0.68, "building"),
+    "work ethic": (0.58, "reflective"),
+    "maintaining momentum": (0.62, "building"),
+    "pressure of fame": (0.50, "tension"),
+    "scrutiny": (0.50, "tension"),
+    "cultural impact": (0.56, "reflective"),
+    "outro": (0.48, "resolve"),
+}
+DEFAULT_ARC = [(0.50, "reflective"), (0.60, "building"), (0.50, "tension"),
+               (0.55, "building"), (0.45, "resolve")]
 
 
 def m2f(m):
@@ -47,87 +89,96 @@ def m2f(m):
 
 
 def fft_shape(x, func):
-    """Apply spectral envelope func(hz)->gain via FFT (fast, loop-free)."""
     X = np.fft.rfft(x)
     hz = np.fft.rfftfreq(len(x), 1.0 / SR)
     X *= func(hz)
     return np.fft.irfft(X, len(x))
 
 
-# ---------------- instruments ----------------
+# ---------------- instruments (all percussion-free) -------------------------
 
-def ks_pluck(freq, dur=1.4, seed=1):
-    """Karplus-Strong pluck (opuscar pluck.py equivalent, numpy period loop)."""
-    period = max(int(round(SR / freq)), 2)
-    rng = np.random.default_rng(seed)
-    buf = rng.uniform(-1.0, 1.0, period)
-    out = np.empty(int(dur * SR))
-    take = min(period, len(out))
-    out[:take] = buf[:take]
-    i = period
-    d = 0.9962
-    while i < len(out):
-        buf = d * 0.5 * (buf + np.roll(buf, -1))
-        take = min(period, len(out) - i)
-        out[i:i + take] = buf[:take]
-        i += take
-    return fft_shape(out, lambda h: 1.0 / np.sqrt(1.0 + (h / 3200.0) ** 2))
-
-
-def pad_chord(notes, dur):
-    """Detuned soft-saw triad, LP-tilted, slow edges; notes all >= MIDI 48."""
+def pad_chord(notes, dur, intensity=0.6):
+    """Soft detuned triad stack, LP-tilted, very slow edges (2.2s in, 2.8s out)."""
     n = int(dur * SR)
     t = np.arange(n) / SR
     out = np.zeros(n)
-    rng = np.random.default_rng(7000 + int(notes[0] * 10))
+    rng = np.random.default_rng(7000 + sum(notes))
     for m in notes:
         f = m2f(m)
-        for det, g in ((-0.0035, 0.5), (0.0, 1.0), (0.0035, 0.5)):
+        for det, g in ((-0.004, 0.5), (0.0, 1.0), (0.004, 0.5)):
             fd = f * (1.0 + det)
             ph = rng.uniform(0, 2 * np.pi, 6)
             v = np.zeros(n)
             for h in range(1, 7):
-                v += (1.0 / h ** 1.7) * np.sin(2 * np.pi * h * fd * t + ph[h - 1])
-            out += g * v / 9.0
-    out = fft_shape(out, lambda h: 1.0 / np.sqrt(1.0 + (h / 1500.0) ** 4))
-    a = int(0.9 * SR); r = int(0.45 * SR)
+                v += (1.0 / h ** 1.8) * np.sin(2 * np.pi * h * fd * t + ph[h - 1])
+            out += g * v / (9.0 * len(notes) ** 0.5)
+    out = fft_shape(out, lambda h: 1.0 / np.sqrt(1.0 + (h / 1200.0) ** 4))
+    a = int(2.2 * SR)
+    r = int(2.8 * SR)
     env = np.ones(n)
-    env[:a] = np.linspace(0, 1, a) ** 2
-    env[-r:] *= np.linspace(1, 0, r)
-    return out * env
+    if n > a + r:
+        env[:a] = np.linspace(0, 1, a) ** 2
+        env[-r:] *= np.linspace(1, 0, r) ** 1.5
+    return out * env * (0.55 + 0.45 * intensity)
 
 
-def bass_pulse(f, dur):
-    """8th-note bass: fundamental + 2nd + 3rd harmonics (phone-speaker trick)."""
+def low_string(root_midi, dur, intensity=0.6):
+    """Sustained low layer: detuned saw-ish stack, LP 700 Hz, 3 s swell."""
     n = int(dur * SR)
     t = np.arange(n) / SR
-    w = (np.sin(2 * np.pi * f * t) + 0.55 * np.sin(2 * np.pi * 2 * f * t)
-         + 0.28 * np.sin(2 * np.pi * 3 * f * t))
-    env = np.minimum(t / 0.008, 1.0) * np.exp(-t * 3.0)
-    return w * env
+    f = m2f(root_midi)
+    out = np.zeros(n)
+    rng = np.random.default_rng(8800 + root_midi)
+    for det in (-0.006, -0.002, 0.003, 0.007):
+        ph = rng.uniform(0, 2 * np.pi)
+        # band-limited-ish saw via first 8 harmonics
+        v = np.zeros(n)
+        for h in range(1, 9):
+            v += (1.0 / h) * np.sin(2 * np.pi * h * f * (1 + det) * t + ph * h)
+        out += v / 8.0
+    out = fft_shape(out, lambda h: 1.0 / np.sqrt(1.0 + (h / 700.0) ** 4))
+    a = int(3.0 * SR)
+    r = int(2.0 * SR)
+    env = np.ones(n)
+    if n > a + r:
+        env[:a] = np.linspace(0, 1, a) ** 1.5
+        env[-r:] *= np.linspace(1, 0, r)
+    return out * env * (0.30 + 0.55 * intensity)
 
 
-def kick_drum():
-    n = int(0.30 * SR)
+def piano_tone(midi, vel=0.5):
+    """Sparse accent: felt-piano-like decaying tone (fundamental + soft
+    partials), 5 s natural decay. Used at most once every two bars."""
+    dur = 5.0
+    n = int(dur * SR)
     t = np.arange(n) / SR
-    f = 48 + (115 - 48) * np.exp(-t / 0.032)
-    w = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.078)
-    rng = np.random.default_rng(99)
-    click = rng.uniform(-1, 1, int(0.004 * SR)) * 0.4
-    w[:len(click)] += click
-    return fft_shape(w, lambda h: h < 7000)
+    f = m2f(midi)
+    rng = np.random.default_rng(6600 + midi)
+    x = (np.sin(2 * np.pi * f * t)
+         + 0.42 * np.sin(2 * np.pi * 2 * f * t + rng.uniform(0, 6))
+         + 0.18 * np.sin(2 * np.pi * 3.01 * f * t)
+         + 0.08 * np.sin(2 * np.pi * 4.02 * f * t))
+    x *= np.exp(-t * 1.05)
+    attack = int(0.006 * SR)
+    x[:attack] *= np.linspace(0, 1, attack)
+    x = fft_shape(x, lambda h: 1.0 / np.sqrt(1.0 + (h / 2600.0) ** 3))
+    return x * vel
 
 
-def hat():
-    n = int(0.09 * SR)
-    rng = np.random.default_rng(1234)
-    x = rng.uniform(-1, 1, n) * np.exp(-np.arange(n) / SR / 0.024)
-    return fft_shape(x, lambda h: (h > 6000).astype(float))
+def sub_root(root_midi, dur):
+    """Deep sustained root, two octaves down, near-imperceptible glue."""
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    f = m2f(root_midi - 12)
+    x = np.sin(2 * np.pi * f * t)
+    a = int(0.8 * SR)
+    x[:a] *= np.linspace(0, 1, a)
+    x[-a:] *= np.linspace(1, 0, a)
+    return x * 0.8
 
 
 def air_bed(dur):
-    """Low 'air' noise floor. Rendered 60s and crossfade-looped (a full-length
-    FFT would need >1 GB of temporaries on 27-min films)."""
+    """Brownian 'air' floor, 60s crossfade-looped (memory-safe)."""
     seg = 60.0
     n = int(seg * SR)
     rng = np.random.default_rng(777)
@@ -138,144 +189,212 @@ def air_bed(dur):
     xf = int(2.0 * SR)
     loop = x[:n - xf].copy()
     w = np.linspace(0, 1, xf)
-    loop[-xf:] = x[n - xf:] * (1 - w) + x[:xf] * w   # tail fades out, head fades in
+    loop[-xf:] = x[n - xf:] * (1 - w) + x[:xf] * w
     reps = int(np.ceil(dur / (seg - 2.0)))
-    out = np.tile(loop.astype(np.float32), reps)[:int((dur + 1.0) * SR)]
-    return out
+    return np.tile(loop.astype(np.float32), reps)[:int((dur + 1.0) * SR)]
 
 
 # ---------------- score assembly ----------------
 
-def compose(total_dur, mood):
-    cfg = PROG[mood]
-    beat = 60.0 / cfg["bpm"]
-    bar = 4 * beat
-    eighth = beat / 2.0
-    six = beat / 4.0
+def sections_from_run(run_dir, total):
+    """Derive (start, end, intensity, mode) sections from script labels."""
+    try:
+        plan = json.load(open(os.path.join(run_dir, "02_script.json")))
+        tl = json.load(open(os.path.join(run_dir, "06_timeline.json")))
+        starts = {int(k): v for k, v in tl.get("starts", {}).items()}
+        durs = {int(k): v for k, v in tl.get("durations", {}).items()}
+        scenes = plan.get("scenes") or [s for seg in plan.get("segments", [])
+                                        for s in seg["scenes"]]
+        if not scenes or not starts:
+            raise ValueError("no timeline")
+        secs = []
+        for sc in scenes:
+            sid = sc["id"]
+            st = starts.get(sid)
+            d = durs.get(sid, 6.0)
+            if st is None:
+                continue
+            it, mode = LABEL_ARC.get((sc.get("label") or "").lower().strip(),
+                                     (0.52, "reflective"))
+            secs.append({"start": round(st, 2), "end": round(st + d, 2),
+                         "intensity": it, "mode": mode})
+        if secs:
+            secs[-1]["end"] = round(total, 2)
+            return secs
+    except Exception:
+        pass
+    # fallback: even five-act arc
+    edges = np.linspace(0, total, len(DEFAULT_ARC) + 1)
+    return [{"start": round(float(edges[i]), 2), "end": round(float(edges[i + 1]), 2),
+             "intensity": it, "mode": mode}
+            for i, (it, mode) in enumerate(DEFAULT_ARC)]
+
+
+def intensity_at(sections, t):
+    for s in sections:
+        if s["start"] <= t < s["end"]:
+            return s["intensity"], s["mode"]
+    return sections[-1]["intensity"], sections[-1]["mode"]
+
+
+def compose(total_dur, sections):
+    """Render the score into L/R float32 buffers. Deterministic."""
+    bpm = 66.0
+    beat = 60.0 / bpm
+    bar = 4 * beat                # 3.636 s
+    chord_dur = 2 * bar           # slow harmonic movement: 7.27 s per chord
     n_total = int((total_dur + 1.0) * SR)
     L = np.zeros(n_total, np.float32)
     R = np.zeros(n_total, np.float32)
 
     def add(snd, at, gl, gr):
         i0 = int(at * SR)
-        if i0 >= n_total:
+        if i0 >= n_total or i0 < 0:
             return
         i1 = min(i0 + len(snd), n_total)
         seg = snd[:i1 - i0]
-        s32 = seg if seg.dtype == np.float32 else seg.astype(np.float32)
-        L[i0:i1] += s32 * np.float32(gl)
-        R[i0:i1] += s32 * np.float32(gr)
+        if seg.dtype != np.float32:
+            seg = seg.astype(np.float32)
+        L[i0:i1] += seg * np.float32(gl)
+        R[i0:i1] += seg * np.float32(gr)
 
-    # prerender repeating material (round-robin variants per opuscar)
-    pads = [pad_chord(ch, bar + 0.9) for ch in cfg["pads"]]
-    basses = {}
-    plucks = {}
-    for root, tones in zip(cfg["bass"], cfg["pluck"]):
-        basses[root] = bass_pulse(m2f(root), eighth * 1.9)
-        basses[root + 12] = bass_pulse(m2f(root + 12), eighth * 1.9)
-        for k, m in enumerate(tones):
-            plucks[m] = [ks_pluck(m2f(m), 1.3, seed=m * 31 + v) for v in range(3)]
-    kick = kick_drum()
-    hats = [hat(), hat() * 0.8]
-    air = air_bed(total_dur + 1.0)
+    # chord timeline: walk the section modes, chord index advances slowly
+    chords = []
+    t = 0.0
+    ci = 0
+    while t < total_dur:
+        _, mode = intensity_at(sections, t)
+        prog = PROGS[mode]
+        chords.append((t, prog[ci % len(prog)], mode))
+        ci += 1
+        t += chord_dur
 
-    sub_f = [m2f(root - 12) for root in cfg["bass"]]
-    rr = 0
-    n_bars = int(np.ceil(total_dur / bar))
-    brk0 = max(4, (n_bars * 2) // 3)          # breakdown bars (variation)
-    for b in range(n_bars):
-        t0 = b * bar
-        if t0 >= total_dur:
-            break
-        ch = b % 4
-        in_intro = t0 < 8 * beat
-        in_brk = brk0 <= b < brk0 + 4
-        # pad (every bar, crossfaded tail)
-        add(pads[ch], t0, G["pad"] * 0.5, G["pad"] * 0.5)
-        # sub: sustained sine per bar
-        dur_s = min(bar, total_dur - t0)
-        tt = np.arange(int(dur_s * SR)) / SR
-        sub = np.sin(2 * np.pi * sub_f[ch] * tt) * np.minimum(tt / 0.05, 1.0)
-        sub *= np.exp(-tt / (dur_s * 1.2))
-        add(sub, t0, G["sub"], G["sub"])
-        if in_intro or in_brk:
-            continue                           # pad + sub + air only
-        # kick
-        for kbeat in cfg["kick_beats"]:
-            add(kick, t0 + kbeat * beat, G["kick"], G["kick"])
-        # hats on offbeat 8ths
-        for e in range(4):
-            add(hats[(b + e) % 2], t0 + e * beat + eighth, G["hat"], G["hat"] * 1.1)
-        # bass 8ths (accent downbeat), last 8th of bar 4 walks up an octave
-        for e in range(8):
-            root = cfg["bass"][ch]
-            if ch == 3 and e == 7:
-                root += 12
-            g = G["bass"] * (1.0 if e % 2 == 0 else 0.78)
-            add(basses[root], t0 + e * eighth, g, g)
-        # pluck 16ths, round-robin, alternating pan
-        patt = (0, 2, 1, 3, 2, 0, 3, 1, 0, 2, 1, 3, 2, 3, 1, 2)
-        tones = cfg["pluck"][ch]
-        for e in range(16):
-            m = tones[patt[e]]
-            v = plucks[m][rr % 3]
-            rr += 1
-            pan = 0.35 if e % 2 else -0.35
-            add(v, t0 + e * six, G["pluck"] * (1 - pan) / 2 + G["pluck"] / 2,
-                G["pluck"] * (1 + pan) / 2 + G["pluck"] / 2)
-    add(air, 0, G["air"], G["air"])
-    del air
+    # pads + sub + low strings per chord slot (crossfaded tails)
+    pad_cache = {}
+    for (t0, ch, mode) in chords:
+        key = (tuple(ch["voicing"]), round(intensity_at(sections, t0)[0], 2))
+        if key not in pad_cache:
+            pad_cache[key] = pad_chord(list(ch["voicing"]),
+                                       chord_dur + 3.0, key[1])
+        inten, mode_now = intensity_at(sections, min(t0 + 0.1, total_dur - 0.01))
+        g = 0.16 * (0.35 + 0.95 * inten)
+        add(pad_cache[key], t0, g, g)
+        add(sub_root(ch["root"], chord_dur + 0.5), t0,
+            0.10 * (0.5 + inten), 0.10 * (0.5 + inten))
+        if inten >= 0.42:      # low strings enter with the development
+            add(low_string(ch["root"] + 12, chord_dur + 1.0, inten), t0,
+                0.05 + 0.11 * inten, 0.05 + 0.11 * inten)
+        if inten >= 0.55:      # airy bloom at emotional peaks
+            hp = pad_chord([m + 12 for m in ch["voicing"]], chord_dur + 3.0, inten)
+            add(hp, t0, 0.045 + 0.05 * inten, 0.045 + 0.05 * inten)
 
-    # global fade-out last 4s
-    f = int(4.0 * SR)
-    tail = min(f, n_total)
-    ramp = np.linspace(1, 0, tail).astype(np.float32)
-    L[-tail:] *= ramp
-    R[-tail:] *= ramp
+    # sparse piano accents: at most one per 2 chords (14.5 s), chord tones,
+    # velocity follows intensity — a deliberate accent, never a pattern
+    rng = np.random.default_rng(SEED)
+    for k, (t0, ch, mode) in enumerate(chords):
+        if k % 2 == 1 or rng.uniform() > 0.75:
+            continue
+        inten, _ = intensity_at(sections, t0)
+        tones = list(ch["voicing"]) + [ch["voicing"][-1] + 7]   # add a 9th option
+        m = int(tones[rng.integers(0, len(tones))]) + 12
+        note = piano_tone(m, vel=0.12 + 0.30 * inten)
+        when = t0 + rng.uniform(0.3, 2.2)
+        add(note, when, 0.30, 0.26)     # slightly off-center stereo
+
+    # air floor
+    add(air_bed(total_dur + 1.0), 0.0, 0.045, 0.045)
+
+    # section dynamics + silence pockets: near-silence (air only) in the last
+    # 1.6s of every section, eased with cosine ramps (never abrupt)
+    for i, s in enumerate(sections[:-1]):
+        b0 = max(s["end"] - 1.6, s["start"])
+        i0, i1 = int(b0 * SR), int(s["end"] * SR)
+        if i1 <= i0 or i1 > n_total:
+            continue
+        dip = (0.12 + 0.88 * np.abs(np.cos(np.linspace(0, np.pi / 2, i1 - i0)))
+               ).astype(np.float32)  # 1.0 -> 0.12
+        L[i0:i1] *= dip
+        R[i0:i1] *= dip
+        # gentle re-bloom into the next section (1.2s)
+        j0, j1 = i1, min(int((s["end"] + 1.2) * SR), n_total)
+        if j1 > j0:
+            bloom = (0.3 + 0.7 * np.linspace(0, 1, j1 - j0)).astype(np.float32)
+            L[j0:j1] *= bloom
+            R[j0:j1] *= bloom
+
+    # global fade-out last 4 s
+    f = min(int(4.0 * SR), n_total)
+    ramp = np.linspace(1, 0, f).astype(np.float32)
+    L[-f:] *= ramp
+    R[-f:] *= ramp
     return L, R
 
 
-def run(run_dir, total_dur, mood=None):
+def _rms_peak(L, R):
+    n2 = 2.0 * len(L)
+    rms = float(np.sqrt((np.dot(L, L) + np.dot(R, R)) / n2))
+    peak = float(max(-L.min(), L.max(), -R.min(), R.max()))
+    return rms, peak
+
+
+def run(run_dir, total_dur, sections=None):
     out_dir = os.path.join(run_dir, "05_music")
     os.makedirs(out_dir, exist_ok=True)
     bed = os.path.join(out_dir, "bed.wav")
-    topic = json.load(open(os.path.join(run_dir, "00_topic.json")))
-    mood = mood or ("dark" if topic.get("style", "documentary") in
-                    ("documentary", "cinematic", "dark") else "bright")
-    if not (os.path.isfile(bed) and os.path.isfile(bed + ".ok")):
-        print(f"[s5] composing {mood} score for {total_dur:.0f}s", flush=True)
-        L, R = compose(total_dur, mood)
-        # headroom mix: RMS target -23 dBFS, hard cap peak -6 dB
-        # (dot-product RMS + min/max peak: no full-size temporaries)
-        n2 = 2.0 * len(L)
-        rms = float(np.sqrt((np.dot(L, L) + np.dot(R, R)) / n2))
-        scale = (10 ** (-23 / 20)) / max(rms, 1e-9)
-        peak = float(max(-L.min(), L.max(), -R.min(), R.max()))
-        if peak * scale > 0.501:
-            scale = 0.501 / peak
-        L *= np.float32(scale); R *= np.float32(scale)
-        with wave.open(bed, "wb") as w:
-            w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
-            chunk = 30 * SR
-            for i in range(0, len(L), chunk):
-                cl = np.clip(L[i:i + chunk] * np.float32(32767), -32768, 32767)
-                cr = np.clip(R[i:i + chunk] * np.float32(32767), -32768, 32767)
-                fr = np.empty((len(cl), 2), np.int16)
-                fr[:, 0] = cl; fr[:, 1] = cr
-                w.writeframes(fr.tobytes())
-        del L, R
-        # safety limiter pass (idempotent, in-place)
-        sh = subprocess.run(
-            ["ffmpeg", "-y", "-v", "error", "-i", bed,
-             "-af", "alimiter=limit=0.891:attack=5:release=80",
-             "-c:a", "pcm_s16le", "-f", "wav", bed + ".lim"],
-            timeout=600, capture_output=True)
-        if sh.returncode == 0:
-            os.replace(bed + ".lim", bed)
-            open(bed + ".ok", "w").write("1")
-        else:
-            raise RuntimeError(f"bed limiter failed: {sh.stderr.decode()[-300:]}")
-    # GATES: audible on phone speakers AND not clipping
+    if sections is None:
+        sections = sections_from_run(run_dir, total_dur)
+    fp_src = json.dumps({"v": COMPOSER_VERSION, "total": round(total_dur, 2),
+                         "sections": sections, "seed": SEED}, sort_keys=True)
+    fp = hashlib.sha256(fp_src.encode()).hexdigest()
+    meta_p = os.path.join(out_dir, "bed.meta.json")
+    if os.path.isfile(bed) and os.path.isfile(meta_p):
+        try:
+            if json.load(open(meta_p)).get("fingerprint") == fp:
+                print(f"[s5] bed cache HIT (fingerprint match)", flush=True)
+                return bed
+        except Exception:
+            pass
+    print(f"[s5] composing cinematic score ({COMPOSER_VERSION}) for "
+          f"{total_dur:.0f}s, {len(sections)} sections", flush=True)
+    L, R = compose(total_dur, sections)
+    # headroom mix: RMS target -26 dBFS, hard cap peak -6 dBFS
+    rms, peak = _rms_peak(L, R)
+    scale = (10 ** (-26 / 20)) / max(rms, 1e-9)
+    if peak * scale > 0.501:
+        scale = 0.501 / peak
+    L *= np.float32(scale)
+    R *= np.float32(scale)
+    with wave.open(bed, "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        chunk = 30 * SR
+        for i in range(0, len(L), chunk):
+            cl = np.clip(L[i:i + chunk] * np.float32(32767), -32768, 32767)
+            cr = np.clip(R[i:i + chunk] * np.float32(32767), -32768, 32767)
+            fr = np.empty((len(cl), 2), np.int16)
+            fr[:, 0] = cl
+            fr[:, 1] = cr
+            w.writeframes(fr.tobytes())
+    del L, R
+    # safety limiter pass (idempotent)
+    sh = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", bed,
+         "-af", "alimiter=limit=0.501:attack=8:release=120",
+         "-c:a", "pcm_s16le", "-f", "wav", bed + ".lim"],
+        timeout=900, capture_output=True)
+    if sh.returncode == 0:
+        os.replace(bed + ".lim", bed)
+    else:
+        raise RuntimeError(f"bed limiter failed: {sh.stderr.decode()[-300:]}")
+    json.dump({"fingerprint": fp, "engine": COMPOSER_VERSION,
+               "sections": sections, "duration": total_dur + 1, "seed": SEED},
+              open(meta_p, "w"), indent=1)
+    json.dump({"engine": COMPOSER_VERSION, "path": bed,
+               "duration": total_dur + 1, "sections": len(sections),
+               "fingerprint": fp},
+              open(os.path.join(run_dir, "05_music.json"), "w"), indent=1)
+    # GATES: subtle by design, never clipping, never inaudible
     chk = subprocess.run(["ffmpeg", "-hide_banner", "-i", bed, "-t", "120",
                           "-af", "volumedetect", "-f", "null", "-"],
                          capture_output=True, text=True)
@@ -286,13 +405,11 @@ def run(run_dir, total_dur, mood=None):
         if "max_volume" in ln:
             mx = float(ln.split("max_volume:")[1].split("dB")[0])
     print(f"[s5] bed gate: mean={mean}dB max={mx}dB", flush=True)
-    if mx is None or mx < -22.0:
-        raise RuntimeError(f"bed too quiet to hear (max {mx} dB) — refusing")
-    if mx > -0.7:
-        raise RuntimeError(f"bed clipping (max {mx} dB) — refusing (distortion ban)")
-    json.dump({"mood": mood, "path": bed, "duration": total_dur + 1,
-               "mean_db": mean, "max_db": mx, "engine": "opuscar-composer-v1"},
-              open(os.path.join(run_dir, "05_music.json"), "w"), indent=1)
+    if mx is None or mx < -24.0 or mx > -5.0:
+        raise RuntimeError(f"bed loudness out of documentary range "
+                           f"(max {mx} dB) — refusing")
+    if mean is None or mean < -50.0:
+        raise RuntimeError(f"bed too quiet (mean {mean} dB) — refusing")
     return bed
 
 

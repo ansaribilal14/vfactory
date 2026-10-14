@@ -2,9 +2,11 @@
 """Stage 3 (v2): narration via edge-tts premium neural voices.
 
 R13 voice fix: tongtong (z-ai) is BANNED for English narration after user
-feedback ("gutter like voice"). Primary: en-US-AndrewNeural (deep documentary
-narrator). Fallback per scene: z-ai tongtong (only to keep the run alive).
-Outputs per-scene MP3 + 03_timings.json (schema-compatible with s6).
+feedback ("gutter like voice"). Primary + ONLY voice: en-US-AndrewNeural.
+R15: the tongtong "keep the run alive" fallback is REMOVED — a failed scene
+fails the build loudly. A missing, silent, undecodable, duplicated or
+mis-mapped narration segment is a release-blocking failure, and every run
+emits a voice validation report (03_voice/validation.json).
 """
 import asyncio, json, os, subprocess, sys, time
 
@@ -13,8 +15,7 @@ import edge_tts  # noqa: E402
 
 VOICE = os.environ.get("VF_VOICE", "en-US-AndrewNeural")
 RATE = os.environ.get("VF_RATE", "-3%")
-TAIL_TARGET_SEC = 1580.0  # narration floor; -15% rate yields ~1595s   # minimum narration seconds for a 27+ min film
-SLOW_RATE = "-9%"          # re-synthesis rate if total is short
+SLOW_RATE = "-9%"          # re-synthesis rate if a project floor demands it
 
 
 def audio_len(path):
@@ -27,11 +28,86 @@ def audio_len(path):
         return 0.0
 
 
+def peak_db(path):
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", path, "-af",
+                        "volumedetect", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    for ln in r.stderr.splitlines():
+        if "max_volume" in ln:
+            try:
+                return float(ln.split("max_volume:")[1].split("dB")[0])
+            except ValueError:
+                pass
+    return -99.0
+
+
 def synth(text, out, rate):
     async def _go():
         c = edge_tts.Communicate(text, VOICE, rate=rate)
         await c.save(out)
     asyncio.run(_go())
+
+
+def validate_voice_assets(run_dir, plan, timings):
+    """R15: per-segment narration validation report (release-blocking).
+
+    Checks every scripted scene has EXACTLY one narration file that is
+    present, decodable, non-empty, non-silent, of sane duration, and mapped
+    to the right scene id. Missing / duplicated / out-of-range / misaligned
+    segments are reported and FAIL the stage.
+    """
+    want = [sc["id"] for sc in scenes_of(plan)]
+    by_id = {}
+    dups = []
+    for t in timings:
+        by_id.setdefault(t["id"], []).append(t)
+    entries, problems = [], []
+    for sid in want:
+        got = by_id.get(sid, [])
+        if not got:
+            problems.append({"id": sid, "issue": "missing narration segment"})
+            continue
+        if len(got) > 1:
+            dups.append(sid)
+        t = got[0]
+        p = t["wav"]
+        ent = {"id": sid, "wav": p}
+        if not os.path.isfile(p):
+            ent["issue"] = "file not found"
+            problems.append(ent)
+            entries.append(ent)
+            continue
+        d = audio_len(p)
+        pk = peak_db(p)
+        ent.update({"dur_s": round(d, 2), "peak_db": round(pk, 1)})
+        if d < 1.5:
+            ent["issue"] = f"too short ({d:.2f}s) — likely truncated TTS"
+        elif d > 240.0:
+            ent["issue"] = f"implausibly long ({d:.1f}s) — mapping suspect"
+        elif pk < -40.0:
+            ent["issue"] = f"silent audio (peak {pk}dB)"
+        elif d < t.get("audio", 0) - 1.5:
+            ent["issue"] = "timings duration exceeds actual audio"
+        if "issue" in ent:
+            problems.append(ent)
+        entries.append(ent)
+    extra = sorted(set(by_id) - set(want))
+    for sid in extra:
+        problems.append({"id": sid, "issue": "unmapped/orphan narration segment"})
+    if dups:
+        problems.append({"issue": f"duplicated scene ids: {dups}"})
+    report = {"voice": VOICE, "rate": RATE, "expected": len(want),
+              "found": len(by_id), "segments": entries,
+              "problems": problems,
+              "verdict": "pass" if not problems else "fail"}
+    json.dump(report, open(os.path.join(run_dir, "03_voice", "validation.json"),
+                           "w"), indent=1)
+    if problems:
+        raise RuntimeError(f"VOICE VALIDATION FAILED ({len(problems)} problem(s)): "
+                           f"{json.dumps(problems[:5])} — see 03_voice/validation.json")
+    print(f"[s3] validation: {len(want)}/{len(want)} narration segments OK",
+          flush=True)
+    return report
 
 
 def scenes_of(plan):
@@ -137,14 +213,10 @@ def run(run_dir):
                 except Exception:
                     time.sleep(2 + attempt * 3)
             if not ok:
-                # last-resort fallback keeps the run alive (log loudly)
-                from lib import zai
-                wav = mp3.replace(".mp3", ".wav")
-                if zai.tts(sc["narration"], wav, voice="tongtong", speed=1.0, fmt="wav"):
-                    mp3 = wav
-                else:
-                    failures.append(sc["id"])
-                    continue
+                # R15: NO voice substitution. A failed TTS scene fails the
+                # build loudly — never silently ship another voice.
+                failures.append(sc["id"])
+                continue
         timings.append({"id": sc["id"], "wav": mp3, "audio": round(audio_len(mp3), 2)})
 
     if failures:
@@ -154,8 +226,8 @@ def run(run_dir):
     meta = {"voice": VOICE, "rate": RATE, "timings": timings, "narration_total": round(total, 2)}
     floor = plan.get("target_sec", 0)   # project-scoped length floor (R12 was blackpink-only)
     if floor and total < floor and RATE != SLOW_RATE:
-        print(f"narration {total:.0f}s < {TAIL_TARGET_SEC:.0f}s — re-synthesizing at {SLOW_RATE}",
-              flush=True)
+        print(f"narration {total:.0f}s < project floor {floor:.0f}s — "
+              f"re-synthesizing at {SLOW_RATE}", flush=True)
         for t in timings:
             os.remove(t["wav"]) if t["wav"].endswith(".mp3") and os.path.exists(t["wav"]) else None
         timings2 = []
@@ -168,6 +240,8 @@ def run(run_dir):
                 "narration_total": round(total, 2)}
 
     json.dump(meta, open(os.path.join(run_dir, "03_timings.json"), "w"), indent=1)
+    # R15: release-blocking per-segment validation report
+    validate_voice_assets(run_dir, plan, meta["timings"])
     print(f"voice done: {len(meta['timings'])} scenes, narration {total/60:.2f} min "
           f"({VOICE} @{meta['rate']})", flush=True)
     return meta["timings"]
