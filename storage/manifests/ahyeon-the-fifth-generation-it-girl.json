@@ -1,0 +1,30 @@
+{
+ "schema_version": 1,
+ "project_id": "ahyeon-the-fifth-generation-it-girl",
+ "status": "active",
+ "assets": [
+  {
+   "asset_id": "film-ahyeon-the-fifth-generation-it-girl-v1-720p",
+   "asset_type": "video_final",
+   "filename": "ahyeon-the-fifth-generation-it-girl_full_720p.mp4",
+   "provider": "github-release",
+   "remote_id": "film-ahyeon-the-fifth-generation-it-girl",
+   "remote_url": "https://github.com/ansaribilal14/vfactory/releases/download/film-ahyeon-the-fifth-generation-it-girl/ahyeon-the-fifth-generation-it-girl_full_720p.mp4",
+   "size_bytes": 448472359,
+   "sha256": null,
+   "verification_status": "uploaded_unverified",
+   "availability_status": "available",
+   "retention_policy": "release asset (deleted after user download)",
+   "expiration_at": null,
+   "generation_stage": "s6_render",
+   "version": "v1",
+   "dependencies": [
+    "narration-wavs",
+    "mv-pool"
+   ],
+   "retry_status": "sha pending (computable from local final.mp4)",
+   "notes": "v1: opuscar composed score, clip-proof master chain"
+  }
+ ],
+ "updated_at": "2026-10-14T03:47:09+0000"
+}
