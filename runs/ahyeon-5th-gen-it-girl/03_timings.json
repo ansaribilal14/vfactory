@@ -1,0 +1,77 @@
+{
+ "voice": "en-US-AndrewNeural",
+ "rate": "-9%",
+ "timings": [
+  {
+   "id": 1,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_01.mp3",
+   "audio": 21.82
+  },
+  {
+   "id": 2,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_02.mp3",
+   "audio": 29.93
+  },
+  {
+   "id": 3,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_03.mp3",
+   "audio": 25.46
+  },
+  {
+   "id": 4,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_04.mp3",
+   "audio": 25.8
+  },
+  {
+   "id": 5,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_05.mp3",
+   "audio": 26.5
+  },
+  {
+   "id": 6,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_06.mp3",
+   "audio": 32.69
+  },
+  {
+   "id": 7,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_07.mp3",
+   "audio": 31.03
+  },
+  {
+   "id": 8,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_08.mp3",
+   "audio": 24.86
+  },
+  {
+   "id": 9,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_09.mp3",
+   "audio": 25.85
+  },
+  {
+   "id": 10,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_10.mp3",
+   "audio": 31.03
+  },
+  {
+   "id": 11,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_11.mp3",
+   "audio": 34.63
+  },
+  {
+   "id": 12,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_12.mp3",
+   "audio": 25.92
+  },
+  {
+   "id": 13,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_13.mp3",
+   "audio": 24.77
+  },
+  {
+   "id": 14,
+   "wav": "runs/ahyeon-5th-gen-it-girl/03_voice/scene_14.mp3",
+   "audio": 26.14
+  }
+ ],
+ "narration_total": 386.43
+}

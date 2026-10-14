@@ -107,8 +107,9 @@ def run(run_dir):
             if bad:
                 raise RuntimeError(f"SILENT narration detected {bad} — refusing")
             total = sum(t["audio"] for t in timings)
-            if total < 1500:
-                raise RuntimeError(f"narration total {total:.0f}s < 1500s floor "
+            floor = plan.get("target_sec", 0)
+            if floor and total < floor:
+                raise RuntimeError(f"narration total {total:.0f}s < {floor:.0f}s floor "
                                    f"— wav mapping suspect")
             meta = {"voice": VOICE, "rate": os.environ.get("VF_RATE", "-15%"),
                     "timings": timings, "narration_total": round(total, 2),
@@ -151,7 +152,8 @@ def run(run_dir):
 
     total = sum(t["audio"] for t in timings)
     meta = {"voice": VOICE, "rate": RATE, "timings": timings, "narration_total": round(total, 2)}
-    if total < TAIL_TARGET_SEC and RATE != SLOW_RATE:
+    floor = plan.get("target_sec", 0)   # project-scoped length floor (R12 was blackpink-only)
+    if floor and total < floor and RATE != SLOW_RATE:
         print(f"narration {total:.0f}s < {TAIL_TARGET_SEC:.0f}s — re-synthesizing at {SLOW_RATE}",
               flush=True)
         for t in timings:

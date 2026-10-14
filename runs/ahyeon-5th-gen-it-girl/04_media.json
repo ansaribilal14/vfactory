@@ -1,0 +1,395 @@
+{
+ "1": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_01.mp4",
+  "kind": "video",
+  "dur": 22.57,
+  "shots": [
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 8.0,
+    "len": 7.54
+   },
+   {
+    "src": "ahyeon_fancam",
+    "start": 8.0,
+    "len": 7.54
+   },
+   {
+    "src": "sheesh",
+    "start": 8.0,
+    "len": 7.54
+   }
+  ]
+ },
+ "2": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_02.mp4",
+  "kind": "video",
+  "dur": 30.63,
+  "shots": [
+   {
+    "src": "ahyeon_fancam",
+    "start": 34.74,
+    "len": 7.68
+   },
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 34.74,
+    "len": 7.68
+   },
+   {
+    "src": "drip",
+    "start": 21.06,
+    "len": 7.68
+   },
+   {
+    "src": "sheesh",
+    "start": 34.74,
+    "len": 7.68
+   }
+  ]
+ },
+ "3": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_03.mp4",
+  "kind": "video",
+  "dur": 26.23,
+  "shots": [
+   {
+    "src": "ahyeon_fancam",
+    "start": 55.45,
+    "len": 6.57
+   },
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 55.45,
+    "len": 6.57
+   },
+   {
+    "src": "last_eval",
+    "start": 30.32,
+    "len": 6.57
+   },
+   {
+    "src": "debut_showcase",
+    "start": 30.32,
+    "len": 6.57
+   }
+  ]
+ },
+ "4": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_04.mp4",
+  "kind": "video",
+  "dur": 26.6,
+  "shots": [
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 79.87,
+    "len": 6.65
+   },
+   {
+    "src": "ahyeon_fancam",
+    "start": 79.87,
+    "len": 6.65
+   },
+   {
+    "src": "debut_showcase",
+    "start": 54.57,
+    "len": 6.65
+   },
+   {
+    "src": "drip",
+    "start": 41.92,
+    "len": 6.65
+   }
+  ]
+ },
+ "5": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_05.mp4",
+  "kind": "video",
+  "dur": 27.3,
+  "shots": [
+   {
+    "src": "sheesh",
+    "start": 54.41,
+    "len": 6.83
+   },
+   {
+    "src": "ahyeon_fancam",
+    "start": 92.89,
+    "len": 6.83
+   },
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 92.89,
+    "len": 6.83
+   },
+   {
+    "src": "debut_showcase",
+    "start": 80.06,
+    "len": 6.83
+   }
+  ]
+ },
+ "6": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_06.mp4",
+  "kind": "video",
+  "dur": 33.47,
+  "shots": [
+   {
+    "src": "debut_showcase",
+    "start": 103.03,
+    "len": 6.7
+   },
+   {
+    "src": "drip_live",
+    "start": 64.93,
+    "len": 6.7
+   },
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 115.72,
+    "len": 6.7
+   },
+   {
+    "src": "babymons7er",
+    "start": 64.93,
+    "len": 6.7
+   },
+   {
+    "src": "batterup",
+    "start": 64.93,
+    "len": 6.7
+   }
+  ]
+ },
+ "7": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_07.mp4",
+  "kind": "video",
+  "dur": 31.8,
+  "shots": [
+   {
+    "src": "ahyeon_fancam",
+    "start": 110.03,
+    "len": 6.37
+   },
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 134.76,
+    "len": 6.37
+   },
+   {
+    "src": "sheesh",
+    "start": 72.93,
+    "len": 6.37
+   },
+   {
+    "src": "batterup",
+    "start": 85.3,
+    "len": 6.37
+   },
+   {
+    "src": "debut_showcase",
+    "start": 122.4,
+    "len": 6.37
+   }
+  ]
+ },
+ "8": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_08.mp4",
+  "kind": "video",
+  "dur": 25.63,
+  "shots": [
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 156.98,
+    "len": 6.42
+   },
+   {
+    "src": "ahyeon_fancam",
+    "start": 132.15,
+    "len": 6.42
+   },
+   {
+    "src": "drip",
+    "start": 8.0,
+    "len": 6.42
+   },
+   {
+    "src": "forever",
+    "start": 8.0,
+    "len": 6.42
+   }
+  ]
+ },
+ "9": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_09.mp4",
+  "kind": "video",
+  "dur": 26.63,
+  "shots": [
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 171.28,
+    "len": 6.66
+   },
+   {
+    "src": "debut_showcase",
+    "start": 145.95,
+    "len": 6.66
+   },
+   {
+    "src": "likethat",
+    "start": 19.33,
+    "len": 6.66
+   },
+   {
+    "src": "drip_live",
+    "start": 19.33,
+    "len": 6.66
+   }
+  ]
+ },
+ "10": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_10.mp4",
+  "kind": "video",
+  "dur": 31.8,
+  "shots": [
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 21.53,
+    "len": 6.37
+   },
+   {
+    "src": "batterup",
+    "start": 29.64,
+    "len": 6.37
+   },
+   {
+    "src": "wegoup",
+    "start": 29.64,
+    "len": 6.37
+   },
+   {
+    "src": "ahyeon_fancam",
+    "start": 153.3,
+    "len": 6.37
+   },
+   {
+    "src": "sheesh",
+    "start": 91.47,
+    "len": 6.37
+   }
+  ]
+ },
+ "11": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_11.mp4",
+  "kind": "video",
+  "dur": 35.4,
+  "shots": [
+   {
+    "src": "ahyeon_fancam",
+    "start": 175.0,
+    "len": 7.09
+   },
+   {
+    "src": "ahyeon_drip_cam",
+    "start": 188.08,
+    "len": 7.09
+   },
+   {
+    "src": "hotsauce",
+    "start": 44.14,
+    "len": 7.09
+   },
+   {
+    "src": "wegoup",
+    "start": 44.14,
+    "len": 7.09
+   },
+   {
+    "src": "debut_showcase",
+    "start": 161.91,
+    "len": 7.09
+   }
+  ]
+ },
+ "12": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_12.mp4",
+  "kind": "video",
+  "dur": 26.63,
+  "shots": [
+   {
+    "src": "ahyeon_fancam",
+    "start": 192.9,
+    "len": 6.68
+   },
+   {
+    "src": "debut_showcase",
+    "start": 180.22,
+    "len": 6.68
+   },
+   {
+    "src": "drip_live",
+    "start": 78.78,
+    "len": 6.68
+   },
+   {
+    "src": "sheesh_live",
+    "start": 53.42,
+    "len": 6.68
+   }
+  ]
+ },
+ "13": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_13.mp4",
+  "kind": "video",
+  "dur": 25.57,
+  "shots": [
+   {
+    "src": "debut_showcase",
+    "start": 15.09,
+    "len": 6.39
+   },
+   {
+    "src": "drip",
+    "start": 62.34,
+    "len": 6.39
+   },
+   {
+    "src": "sheesh",
+    "start": 111.91,
+    "len": 6.39
+   },
+   {
+    "src": "babymons7er",
+    "start": 87.12,
+    "len": 6.39
+   }
+  ]
+ },
+ "14": {
+  "path": "runs/ahyeon-5th-gen-it-girl/04_media/scenes/scene_14.mp4",
+  "kind": "video",
+  "dur": 26.9,
+  "shots": [
+   {
+    "src": "likethat",
+    "start": 76.7,
+    "len": 6.74
+   },
+   {
+    "src": "drip_live",
+    "start": 102.17,
+    "len": 6.74
+   },
+   {
+    "src": "sheesh_live",
+    "start": 76.7,
+    "len": 6.74
+   },
+   {
+    "src": "drip",
+    "start": 76.7,
+    "len": 6.74
+   }
+  ]
+ }
+}

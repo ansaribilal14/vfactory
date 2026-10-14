@@ -49,9 +49,26 @@ ALIASES = {
     "deadline_tr": ["deadline", "tour", "2025", "rehearsal", "trailer", "reunion", "stadium"],
     "goyang_bts": ["deadline", "goyang", "rehearsal", "behind", "2025", "practice", "tour"],
     "asiif": ["blackpink", "members", "group", "documentary", "profile"],
+    # --- BABYMONSTER / Ahyeon pool (ahyeon-5th-gen-it-girl + future runs) ---
+    "drip": ["drip", "title track", "2024", "comeback", "hip hop", "swagger"],
+    "sheesh": ["sheesh", "debut", "april 2024", "first", "official debut"],
+    "babymons7er": ["babymons7er", "debut", "2023", "pre debut", "batter up era"],
+    "forever": ["forever", "2024", "summer", "bright", "youthful"],
+    "batterup": ["batter up", "debut single", "2023", "first", "baseball"],
+    "stuck": ["stuck in the middle", "ballad", "emotional", "soft", "2024"],
+    "hotsauce": ["hot sauce", "2025", "comeback", "spicy", "energy"],
+    "likethat": ["like that", "2024", "b-side", "hip hop"],
+    "wegoup": ["we go up", "wego up", "2025", "album", "sellout", "rise"],
+    "drip_live": ["drip", "live", "stage", "concert", "performance", "crowd"],
+    "sheesh_live": ["sheesh", "live", "stage", "music show", "performance"],
+    "ahyeon_fancam": ["ahyeon", "fancam", "focus", "close up", "dancer"],
+    "ahyeon_drip_cam": ["ahyeon", "drip", "fancam", "focus", "stage"],
+    "last_eval": ["last evaluation", "trainee", "pre debut", "YG", "evaluation", "practice"],
+    "debut_showcase": ["showcase", "debut", "press", "stage", "first performance"],
 }
 
-MEMBERS = ["jennie", "lisa", "jisoo", "rose", "rosie", "rosé"]
+MEMBERS = ["jennie", "lisa", "jisoo", "rose", "rosie", "rosé",
+           "ahyeon", "ruka", "chiquita", "rami", "rora", "asa", "pharita"]
 
 
 def ffprobe_dur(path):

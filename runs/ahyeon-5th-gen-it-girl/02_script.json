@@ -1,0 +1,107 @@
+{
+ "title": "Ahyeon: The Fifth Generation IT Girl",
+ "logline": "The journey of BABYMONSTER's Ahyeon as she rises to become the definitive IT Girl of K-Pop's fifth generation.",
+ "scenes": [
+  {
+   "id": 1,
+   "label": "hook",
+   "narration": "What makes a star in the age of digital fame? Ahyeon's journey from Chuncheon to global IT Girl status began in 2019 when she first appeared on Produce 48. Her unique charm and talent quickly captured international attention, transforming her into a digital sensation with millions of followers worldwide.",
+   "on_screen": "The Fifth Generation Star",
+   "visual_query": "Ahyeon BABYMONSTER performing on stage"
+  },
+  {
+   "id": 2,
+   "label": "early life",
+   "narration": "Born on April 11, 2007, in Toegye-dong, Chuncheon, Gangwon-do, South Korea, Ahyeon spent her formative years in this quiet mountain city before embarking on her extraordinary journey to stardom. The young artist developed her talents in this peaceful environment, surrounded by the natural beauty of Gangwon-do province. These early years in Chuncheon would later influence her artistic vision and shape the performer she would become.",
+   "on_screen": "Humble Beginnings",
+   "visual_query": "Chuncheon city landscape"
+  },
+  {
+   "id": 3,
+   "label": "training days",
+   "narration": "Before joining BABYMONSTER, Ahyeon dedicated five rigorous years to training. During this period, she developed her skills as a main vocalist and lead rapper while building friendships with fellow trainees that would last through her career. This extensive preparation shaped her into the versatile performer she is today, ready to take on the challenges of the K-pop industry.",
+   "on_screen": "Five Years of Preparation",
+   "visual_query": "Young trainees practicing dance"
+  },
+  {
+   "id": 4,
+   "label": "multilingual talent",
+   "narration": "Ahyeon's remarkable ability to communicate across borders stems from her language skills. She became fluent in both English and Chinese during her training years, giving her a unique advantage in connecting with international fans. This linguistic foundation allows her to bridge cultural gaps and foster understanding through direct, personal communication with diverse audiences worldwide.",
+   "on_screen": "Global Communicator",
+   "visual_query": "Ahyeon speaking multiple languages"
+  },
+  {
+   "id": 5,
+   "label": "debut anticipation",
+   "narration": "The 2018-2022 period marked BABYMONSTER's formation and pre-debut activities. During these years, Ahyeon gained significant attention as a trainee, building anticipation among fans who recognized her potential even before her official debut. Her consistent performances and dedication during this training period helped establish her as a standout member of the group.",
+   "on_screen": "Building Anticipation",
+   "visual_query": "BABYMONSTER pre-debut photoshoot"
+  },
+  {
+   "id": 6,
+   "label": "debut moment",
+   "narration": "In 2023, the entertainment world witnessed the introduction and debut of BABYMONSTER, marking a significant new chapter in K-pop history. Ahyeon emerged as a standout member from the beginning, captivating audiences with her powerful vocals and commanding stage presence. Her remarkable talent quickly captured widespread attention, firmly establishing her as the group's defining star and setting the stage for her continued ascent in the music industry.",
+   "on_screen": "The Big Debut",
+   "visual_query": "BABYMONSTER debut stage performance"
+  },
+  {
+   "id": 7,
+   "label": "record-breaking moment",
+   "narration": "Ahyeon achieved a historic milestone by becoming the first K-Pop idol to enter the iTunes charts with a cover rather than an official release. This unprecedented accomplishment demonstrated her unique ability to captivate audiences with non-original content. The achievement marked a significant moment in K-Pop history, showing how artistic interpretation could resonate with international listeners in ways previously unexplored by industry standards.",
+   "on_screen": "Chart History",
+   "visual_query": "iTunes charts showing Ahyeon's cover"
+  },
+  {
+   "id": 8,
+   "label": "international recognition",
+   "narration": "Her popularity in China skyrocketed as Ahyeon became the most searched 5th generation female idol on Google worldwide in 2024. This international recognition solidified her status as a global phenomenon beyond the boundaries of K-Pop. The search data demonstrated her unprecedented appeal across multiple continents during that remarkable year.",
+   "on_screen": "Global Search Champion",
+   "visual_query": "Ahyeon meeting Chinese fans"
+  },
+  {
+   "id": 9,
+   "label": "work ethic",
+   "narration": "2024 proved to be Ahyeon's busiest year, earning her the title of busiest female idol with an astonishing 583 schedules. This relentless work ethic demonstrated her commitment to her craft and her position as the group's central figure. The sheer volume of activities cemented her status as one of the most dedicated performers in the industry that year.",
+   "on_screen": "The 583 Schedule Year",
+   "visual_query": "Ahyeon backstage between performances"
+  },
+  {
+   "id": 10,
+   "label": "commercial success",
+   "narration": "Ahyeon's 'wego up' album became the first by a 5th generation artist to sell out in numerous countries, demonstrating her commercial appeal and the devoted following she had built through her authentic connection with fans. This remarkable achievement marked a significant milestone in her career, proving her ability to resonate with audiences across different markets. The album's success solidified Ahyeon's position as a rising star in the global music landscape.",
+   "on_screen": "Sold Out Phenomenon",
+   "visual_query": "Album sales graph showing 'wego up' success"
+  },
+  {
+   "id": 11,
+   "label": "maintaining momentum",
+   "narration": "By 2025, Ahyeon maintained her position as the most searched 5th generation female idol worldwide according to Google Trends, proving her sustained relevance and ability to remain in the public eye amid intense competition in the K-Pop landscape. Her consistent top rankings demonstrated remarkable staying power in an industry known for rapid turnover and evolving fan preferences. This achievement highlighted Ahyeon's unique connection with global audiences and her enduring impact on the music scene.",
+   "on_screen": "Sustained Reign",
+   "visual_query": "Google Trends graph showing search data"
+  },
+  {
+   "id": 12,
+   "label": "pressure of fame",
+   "narration": "With IT Girl status comes intense scrutiny and pressure. Ahyeon navigates the challenges of constant public attention while maintaining her artistic integrity, becoming a role model for young fans who see her as more than just an entertainer. She balances fame with authenticity, proving that success and staying true to oneself can coexist in the demanding world of celebrity.",
+   "on_screen": "Behind the Spotlight",
+   "visual_query": "Ahyeon backstage looking thoughtful"
+  },
+  {
+   "id": 13,
+   "label": "cultural impact",
+   "narration": "Ahyeon represents the evolution of the IT Girl concept in the fifth generation, combining traditional idol qualities with digital-native sensibilities. Her success reflects changing cultural values and the global nature of modern fame. This transformation marks a significant shift in how influence is cultivated and measured in today's interconnected world.",
+   "on_screen": "Defining a Generation",
+   "visual_query": "Ahyeon with diverse international fans"
+  },
+  {
+   "id": 14,
+   "label": "outro",
+   "narration": "From Chuncheon to global stardom, Ahyeon's journey continues to redefine what it means to be an IT Girl in the digital age. As K-Pop's fifth generation evolves, her influence will undoubtedly shape the stars of tomorrow. Her unique style and captivating performances have already inspired millions across continents, proving that talent knows no geographical boundaries.",
+   "on_screen": "The Future is Ahyeon",
+   "visual_query": "Ahyeon looking toward the future"
+  }
+ ],
+ "topic": "Ahyeon BABYMONSTER the 5th generation it girl",
+ "style": "documentary",
+ "region": "us"
+}

@@ -76,6 +76,7 @@ def run(run_dir, deliver=True, chat_id=None):
     size = os.path.getsize(final)
     mb = size / 1024 / 1024
     title = plan.get("title", topic["topic"])
+    slug = topic.get("slug") or _slug(title)   # single project identity (R14)
     caption = (f"<b>{title}</b>\n{topic['topic']}\n"
                f"{tl['total']:.0f}s • {tl.get('scenes') or len(plan['scenes'])} scenes • {mb:.1f} MB\n"
                f"built by vfactory")
@@ -89,6 +90,7 @@ def run(run_dir, deliver=True, chat_id=None):
 
     # 1) Rule 9 — GitHub release ALWAYS for the main film
     result["release"] = publish_release(run_dir, title, topic, chat_id)
+    result["release"]["slug"] = slug
 
     # 1b) R14 — persist final deliverable immediately (storage.to + manifest)
     try:
@@ -97,12 +99,11 @@ def run(run_dir, deliver=True, chat_id=None):
         slug = topic.get("slug") or _slug(title)
         if rel.get("ok"):
             url_main = next((u for u in (rel.get("urls") or {}).values() if u), None)
-            m = persist.load_manifest(topic.get("slug") or "blackpink-gamble")
+            m = persist.load_manifest(slug)
             m["assets"] = [a for a in m["assets"]
-                           if not a["asset_id"].startswith("film-") or
-                           "v2" not in a["asset_id"]]
+                           if not a["asset_id"].startswith("film-")]
             m["assets"].append({
-                "asset_id": f"film-{slug}-v2-720p", "asset_type": "video_final",
+                "asset_id": f"film-{slug}-v1-720p", "asset_type": "video_final",
                 "filename": f"{slug}_full_720p.mp4", "provider": "github-release",
                 "remote_id": rel.get("tag"), "remote_url": url_main,
                 "size_bytes": size, "sha256": None,
@@ -110,19 +111,19 @@ def run(run_dir, deliver=True, chat_id=None):
                 "availability_status": "available",
                 "retention_policy": "release asset (deleted after user download)",
                 "expiration_at": None, "generation_stage": "s6_render",
-                "version": "v2", "dependencies": ["narration-wavs", "mv-pool"],
+                "version": "v1", "dependencies": ["narration-wavs", "mv-pool"],
                 "retry_status": "sha pending (computable from local final.mp4)",
-                "notes": "v2: audio rebuilt, captions removed"})
+                "notes": "v1: opuscar composed score, clip-proof master chain"})
             m["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
             persist.save_manifest(m["project_id"], m)
             persist.git_commit_push(
                 [os.path.relpath(persist._manifest_path(m["project_id"]),
                                  persist.BASE)],
-                f"persist: {m['project_id']}/film-{slug}-v2-720p (release)")
-        up = persist.persist_asset(final, topic.get("slug") or "blackpink-gamble",
-                                   "video_final", "s6_render", version="v2",
-                                   asset_id=f"{slug}-v2-storage-mirror",
-                                   notes="storage.to mirror of v2 final")
+                f"persist: {m['project_id']}/film-{slug}-v1-720p (release)")
+        up = persist.persist_asset(final, slug,
+                                   "video_final", "s6_render", version="v1",
+                                   asset_id=f"{slug}-v1-storage-mirror",
+                                   notes="storage.to mirror of v1 final")
         result["persist"] = {"ok": up.get("ok"), "state": up.get("state"),
                              "url": (up.get("record") or {}).get("remote_url")}
     except Exception as pe:
