@@ -7,7 +7,8 @@ Rebuilt after R13 verdict (distortion + slideshow + broken labels):
   - chapter cards regenerated via drawtext (old cards were black/corrupted)
   - per-segment chunks with xfade inside, clean re-encoded concat between
     chunks (fixes the -c copy timestamp bug for good)
-  - audio: narration timeline + sidechain-ducked bed + loudnorm, FIXED labels
+  - audio: narration (compressed) + sidechain-ducked bed + limiter +
+    TWO-PASS LINEAR loudnorm (opuscar technique; kills the distortion)
   - trailer cut from the finished master
 """
 import json, os, shutil, subprocess, sys
@@ -281,30 +282,48 @@ def pass_c(run_dir, starts, total, video):
     inputs = ["-i", bed]
     for t in timings:
         inputs += ["-i", t["wav"]]
-    fc = [f"[0:a]aformat=channel_layouts=stereo,aresample=48000,volume=1.6,"
+    fc = [f"[0:a]aformat=channel_layouts=stereo,aresample=48000,"
           f"atrim=0:{total:.2f},apad=whole_dur={total:.2f}[bed]"]
     mix_in = ""
     for n, t in enumerate(timings, 1):
         st = starts.get(t["id"], 0.0) + 0.35
         ms = int(max(st, 0.0) * 1000)
         fc.append(f"[{n}:a]aformat=channel_layouts=stereo,aresample=48000,"
-                  f"adelay={ms}|{ms}[s{n}]")
+                  f"acompressor=threshold=0.08:ratio=2.5:attack=15:release=200"
+                  f":makeup=2,adelay={ms}|{ms}[s{n}]")
         mix_in += f"[s{n}]"
     fc.append(f"{mix_in}amix=inputs={len(timings)}:duration=longest:normalize=0[nar]")
-    fc.append("[bed][nar]sidechaincompress=threshold=0.03:ratio=4:attack=40"
-              ":release=700:makeup=2[ducked]")
-    fc.append("[nar][ducked]amix=inputs=2:duration=longest:normalize=0[mixout]")
-    fc.append(f"[mixout]loudnorm=I=-14:TP=-1.5:LRA=11,atrim=0:{total:.2f},"
-              f"afade=t=out:st={max(total - 1.0, 0):.2f}:d=1.0[aout]")
+    fc.append("[bed][nar]sidechaincompress=threshold=0.02:ratio=6:attack=30"
+              ":release=600[ducked]")
+    fc.append("[nar][ducked]amix=inputs=2:duration=longest:normalize=0"
+              f",atrim=0:{total:.2f}[araw]")
     script = os.path.join(work, "passc.fc")
     with open(script, "w") as fh:
         fh.write(";".join(fc))
     mix_wav = os.path.join(work, "mix.wav")
+    mix_raw = os.path.join(work, "mix_raw.wav")
+    lim = "alimiter=limit=0.891:attack=5:release=80"
     if not (os.path.isfile(mix_wav) and os.path.isfile(os.path.join(work, "mix.ok"))):
         print(f"[s6] audio mix ({len(timings)} narrations + bed, {total:.0f}s)", flush=True)
         sh(["ffmpeg", "-y", "-v", "error"] + inputs +
-           ["-filter_complex_script", script, "-map", "[aout]",
+           ["-filter_complex_script", script, "-map", "[araw]",
+            "-ar", "48000", mix_raw], timeout=1800)
+        # TWO-PASS loudnorm (opuscar): pass 1 measures on the limited signal,
+        # pass 2 applies linear gain — no dynamic pumping = no distortion
+        p1 = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-i", mix_raw,
+             "-af", f"{lim},loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json",
+             "-f", "null", "-"], capture_output=True, text=True, timeout=1800)
+        jtxt = p1.stderr[p1.stderr.rfind("{"):p1.stderr.rfind("}") + 1]
+        m = json.loads(jtxt)
+        ln2 = (f"loudnorm=I=-14:TP=-1.5:LRA=11:measured_I={m['input_i']}"
+               f":measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+               f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}"
+               f":linear=true")
+        sh(["ffmpeg", "-y", "-v", "error", "-i", mix_raw,
+            "-af", f"{lim},{ln2},afade=t=out:st={max(total - 1.0, 0):.2f}:d=1.0",
             "-ar", "48000", mix_wav], timeout=1800)
+        os.remove(mix_raw)
         # HARD AUDIO GATE — the v1 film shipped silent; never again
         chk = subprocess.run(["ffmpeg", "-hide_banner", "-i", mix_wav, "-t", "300",
                               "-af", "volumedetect", "-f", "null", "-"],
@@ -320,6 +339,9 @@ def pass_c(run_dir, starts, total, video):
             os.remove(mix_wav)
             raise RuntimeError(f"AUDIO GATE FAILED: mean={mean} max={mx} — "
                                f"narration or bed missing from mix")
+        if mx > -0.7:
+            os.remove(mix_wav)
+            raise RuntimeError(f"CLIP GATE FAILED: max={mx}dB — distortion ban (R1)")
         open(os.path.join(work, "mix.ok"), "w").write("1")
     final = os.path.join(run_dir, "final.mp4")
     if not (os.path.isfile(final) and ffprobe_dur_safe(final) > total - 3.0):
