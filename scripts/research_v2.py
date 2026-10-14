@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lib import zai  # noqa: E402
 
 RUN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   "runs", "ahyeon-it-girl-v2")
+                   "runs", "ahyeon-it-girl-v3")
 
 QUERIES = [
     "Ahyeon BABYMONSTER born April 11 2007 Chuncheon",

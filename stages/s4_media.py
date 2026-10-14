@@ -147,6 +147,20 @@ def index_pool(media_dir):
 # ---------------- 2. PLAN (Director + imgagent) ----------------
 
 def build_plan(run_dir):
+    """Director v2 plans are VERIFIED artifacts: once cut verification has
+    passed, the plan must not be silently regenerated (that would invalidate
+    the verification evidence). Re-plan only when explicitly requested."""
+    plan_p = os.path.join(run_dir, "04_media", "plan.json")
+    ver_p = os.path.join(run_dir, "04_media", "cut_verification.json")
+    if os.path.isfile(plan_p) and os.path.isfile(ver_p):
+        try:
+            ver = json.load(open(ver_p))
+            if ver.get("all_pass") and not os.environ.get("VF_REPLAN"):
+                print("[s4] verified plan present — keeping it (VF_REPLAN=1 "
+                      "to force re-plan)", flush=True)
+                return
+        except Exception:
+            pass
     director.run(run_dir)
 
 
@@ -340,7 +354,13 @@ def render(run_dir):
 
 
 def run(run_dir):
-    index_pool(os.path.join(run_dir, "04_media"))
+    media = os.path.join(run_dir, "04_media")
+    pres_dir = os.path.join(media, "presence")
+    have_pres = os.path.isdir(pres_dir) and any(
+        f.endswith(".json") and not f.endswith(".frames.json")
+        for f in os.listdir(pres_dir))
+    if not have_pres:
+        index_pool(media)          # legacy director-v1 substrate
     build_plan(run_dir)
     attach_place_stills(run_dir)
     return render(run_dir)

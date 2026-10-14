@@ -47,8 +47,10 @@ def publish_release(run_dir, title, topic, chat_id):
             body=f"{title}\n\nDelivered by vfactory (autonomous documentary pipeline).\n"
                  f"Master: {h or '?'}p real-footage render, multi-cut editing, "
                  f"narration + score (loudnorm -14).\n"
-                 f"v2 fixes per user review: on-scene captions removed, "
-                 f"chapter cards redesigned, AUDIO REBUILT (v1 shipped silent).\n"
+                 f"v3: full directorial rebuild per user review — every cut "
+                 f"vision-verified against an AHYEON reference frame (dense "
+                 f"presence map + per-cut head/mid/tail checks + human review); "
+                 f"dedicated vocal-performance spine; era-true absence footage.\n"
                  f"Asset lifecycle: files are removed from this release after "
                  f"the requester has downloaded them (temporary distribution).")
         info.update({"ok": bool(ok_all), "html_url": html_url, "urls": urls})

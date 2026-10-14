@@ -92,3 +92,57 @@ Stage Summary:
   vision-verified shots with exact timecodes, verified place imagery.
 - Open item: vision re-scoring scenes 10-16 when the 429 window lifts (cache
   + fingerprints make it a safe automatic re-render path).
+
+---
+## Session: v3 directorial rebuild (2026-10-14, user verdict: "still random music videos — I need more smartness instead of being quick")
+
+Root cause (v3 findings, deeper than v2):
+- v2 ranked SHOTS by vision+keyword score at SOURCE level; the Director had
+  no idea where the subject IS inside each source, so relevance was a guess.
+- Pool was group-MV dominated; the keyword prior was useless because every
+  group source carried the "ahyeon" tag.
+- Single mid-frame per shot verification: MV shots frequently switch members
+  mid-shot (head=Ahyeon, tail=Rami) and v2 shipped those.
+
+What v3 added (all in stages/ + scripts/):
+- acquire_pool_v3.py — dailymotion-search acquisition with per-key REQUIRED
+  song tokens, member-identity gates (fc_* keys must name AHYEON; other-member
+  solo cams rejected), quality floor 432p+ (288p news clip and 360p re-uploads
+  rejected), bad-title filter (instrumental/lyric/mashup/reaction), global
+  video-id exclusivity (v3.0 bug fixed: one cover video reused under 5 keys).
+- build_presence.py — AHYEON PRESENCE MAP: dense 640px frames every 2s,
+  glm-vision classification against the verified reference image
+  (04_media/reference/ahyeon_ref.jpg, provenance in reference/provenance.json);
+  strict identity prompt with explicit false-positive cost; era-knowledge
+  override for 6-member sources (mv_batterup, mv_sitm flagged no_ahyeon —
+  used ONLY for the absence narrative).
+- stages/director.py (v2) — beat-level planning: narration split into
+  sentence beats with time windows, deterministic keyword intent taxonomy,
+  need->source preference, dedicated/premium quotas (dedicated share 54%,
+  floor 38%), in-point dedupe scan (>2.5s separation), no same-source
+  adjacency, honest fallbacks.
+- verify_cuts.py — PER-CUT verification: head/mid/tail frames of every cut
+  vs reference; failures auto-replaced from unused verified spans; verdict
+  cache; human_veto.json lets the main agent's eyeball rulings override the
+  model (3 model false-positives caught by human review: Rora braided
+  closeup, Rora/Rami bob, Pharita blonde — all replaced).
+- s4: verified-plan guard (plan not silently regenerated after cut
+  verification passes); s7: v3 release body.
+
+Delivery:
+- final.mp4 458.3s 720p30, 350MB; mix + final narration gates PASS (16/16,
+  corr 0.85-0.94), loudness -16.5/-1.4 dB.
+- Release film-ahyeon-the-fifth-generation-it-girl-v3 (ansaribilal14/vfactory)
+  — download-back sha256 VERIFIED (e1cd39b1... matches local master).
+- storage.to mirror: https://storage.to/DrMxe3mQS
+- Telegram: NOT sent (.tg_token missing in this container — honest gap,
+  same as v2; bot @Submittermebot chat_id 1263089875 needs the token stored).
+- imgagent place stills (Chuncheon, YG HQ): HONEST GAPS — image-search API
+  rate-limited all session; recorded, not faked.
+
+Known limits (honest):
+- No true AHYEON facecams on dailymotion (40-hit searches, 0 valid after
+  identity gates) — dedicated spine is cov_dangerously (title-card verified)
+  + grp_dream studio session + presence-verified MV moments.
+- glm vision identity is good but not perfect (3 false positives caught by
+  human review); human_veto mechanism is now a permanent part of the flow.

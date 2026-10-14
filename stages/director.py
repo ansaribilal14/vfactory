@@ -1,251 +1,294 @@
 #!/usr/bin/env python3
-"""stages/director.py — PERMANENT DOCUMENTARY DIRECTOR AGENT (R15).
+"""stages/director.py — DOCUMENTARY DIRECTOR v2 (Ahyeon-dedicated edition).
 
-The Director decides WHAT the viewer sees for every narration beat, BEFORE
-any assembly. It replaces the v1 keyword-overlap + rotated-offset clip
-lineup (user verdict: "random Ahyeon clips... not an editor way of editing").
+User verdict on v2: "still using random music videos instead of ahyeon
+dedicated direction". v2 ranked shots by vision+keyword score and filled
+scenes — the result read as a montage of group MVs. v2's deeper failure:
+the Director had no idea WHERE the subject is inside each source, so any
+"relevance" was at source level, not moment level.
 
-Method (auditable, deterministic):
-  1. Per scene: derive visual intent (narration + visual_query + entities).
-  2. Candidate shots: pool subject_tags/title keyword prefilter over the
-     SHOT INDEX (scene-detected shot boundaries, one frame per shot).
-  3. VISION VERIFICATION: candidate frames go to the vision model in known
-     order; it scores 0..1 how well each frame supports the scene intent
-     and says why. Frames never verified by text similarity alone.
-  4. editorial_score = 0.65*vision + 0.35*keyword (keyword is a safety
-     prior, never proof of relevance).
-  5. Selection: score-ranked, source-diverse, shot-length aware, exact
-     source in/out timecodes, cut order, per-shot reason.
-  6. Review queue: weak-but-nonzero scenes flagged; zero-signal scenes FAIL.
+v2 (this file) directs at MOMENT level:
 
-Outputs:
-  04_media/plan.json          — the edit decision list (consumed by s4 render)
-  04_media/review_queue.json  — ambiguous scenes for human/agent review
+  1. BEATS      each scene narration is split into sentences; time windows
+                are allocated proportionally (character count).
+  2. INTENT     every beat is classified into a footage need (deterministic
+                keyword rules over the narration: era anchors, vocal/
+                absence/pressur/momentum themes).
+  3. MOMENTS    only spans VERIFIED by the AHYEON PRESENCE MAP (dense frame
+                classification against the reference image) are selectable;
+                era-knowledge overrides (6-member sources) are respected —
+                "the absence" scenes use them deliberately.
+  4. POLICY     dedicated-first quotas (cover + studio session), premium
+                (ahyeon_alone) spans first, global shot-reuse caps, no
+                same source twice in a row, energy matched per beat.
+  5. REASONS    every shot cites its beat + the presence evidence.
+
+Outputs: 04_media/plan.json (the EDL), 04_media/review_queue.json.
+Fails loudly when the verified footage cannot support a scene.
 """
-import json, os, sys
+import json, os, re, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import vision  # noqa: E402
 
-MIN_SHOT = 2.0          # shortest usable shot (s)
-SHOT_PAD = 0.30         # skip boundary at shot head
-BEST_OK = 0.35          # below this -> review queue flag
-SCORE_ZERO = 0.10       # below this for ALL shots -> scene fails
+MIN_SHOT = 2.2
+MAX_SHOT = 6.5
+SEG_REUSE_CAP = 2          # shots per presence segment (cover: 5)
+DEDICATED_FLOOR = 0.38     # min share of screen time from dedicated sources
+ALONE_FLOOR = 0.45         # min share from ahyeon_alone-labelled spans
+
+RUN = None                  # set by run()
+
+# ---------------- footage need taxonomy ----------------
+
+# need -> (eligible source kinds/keys, purpose note)
+NEED_SONG = {                # era-anchored group moments (her verified spans)
+    "batter": ["mv_batterup"], "sheesh": ["mv_sheesh", "stage_sheesh"],
+    "drip": ["mv_drip"], "forever": ["mv_forever"],
+    "hotsauce": ["hotsauce"], "hotsauce2": ["mv_hotsauce"],
+    "wegoup": ["mv_wegoup"], "sitm": ["mv_sitm"],
+}
+KEYWORDS = [
+    (r"batter up|debut single|six members|one name missing|not on the stage|"
+     r"sit out|sideline|health reasons|absence|the cruelest twist|"
+     r"watching your own debut", "absence_group"),
+    (r"dangerously|charlie puth|cover|evaluation tape|itunest|itunes|"
+     r"practice room|trainee footage|the tape", "cover"),
+    (r"sheesh|comeback|lineup is finally whole|walks? back out|the return|"
+     r"first comeback", "sheesh"),
+    (r"drip\b|main vocalist|lead rapper|lead dancer|center\b|versatilit|"
+     r"album released november", "drip"),
+    (r"hot sauce|2025 schedule|busiest|calendar built|refuses to cool",
+     "hotsauce"),
+    (r"we go up|sell out|commercial", "wegoup"),
+    (r"stuck in the middle|ballad", "sitm"),
+    (r"chuncheon|toegye|hometown|mountain city|born", "hometown"),
+    (r"yg entertainment|training machine|practice rooms?|five years|"
+     r"trainee|eleven", "studio"),
+    (r"voice|sing|vocal", "vocal"),
+    (r"scrutiny|pressure|costs?|weighs|health hiatus|unfinished|wound|"
+     r"crowd cannot|it girl status", "pressure"),
+    (r"fancam|algorithm|internet|comment section|fandom|public|reach|"
+     r"manufactur|forwarding|captioning", "momentum"),
+    (r"stage|arena|dome|tour|kspo|kyocera|concert|crowd", "stage_energy"),
+    (r"it girl|generation|legacy|assembled|evidence|documented|"
+     r"argument|crown|title", "statement"),
+]
+
+# scene label -> default need (used for beats without keyword hits)
+SCENE_DEFAULT = {
+    "hook": "statement", "the it-girl idea": "statement", "chuncheon": "hometown",
+    "the machine": "studio", "the reveal": "cover", "the absence": "absence_group",
+    "the return": "sheesh", "main vocalist": "drip",
+    "the cover that charted": "cover", "three languages": "vocal",
+    "the arenas": "stage_energy", "the pace": "hotsauce",
+    "the machinery": "momentum", "the price": "pressure",
+    "evidence and noise": "statement", "outro": "statement",
+}
+
+# need -> ordered source preferences.  dedicated sources first when they fit
+# the intent; group MVs appear ONLY with presence-verified Ahyeon spans.
+NEED_SOURCES = {
+    "absence_group": ["mv_batterup", "mv_sitm"],          # group WITHOUT her (era-true)
+    "cover": ["cov_dangerously", "grp_dream"],
+    "sheesh": ["mv_sheesh", "stage_sheesh", "grp_dream"],
+    "drip": ["mv_drip", "grp_dream", "cov_dangerously"],
+    "hotsauce": ["mv_hotsauce", "stage_sheesh", "grp_dream"],
+    "wegoup": ["mv_wegoup", "grp_dream"],
+    "sitm": ["mv_sitm"],                                   # era-true (no her)
+    "hometown": ["grp_dream", "cov_dangerously"],          # stills come via imgagent
+    "studio": ["grp_dream", "cov_dangerously"],
+    "vocal": ["cov_dangerously", "grp_dream"],
+    "pressure": ["mv_wegoup", "mv_sitm", "grp_dream"],
+    "momentum": ["mv_wegoup", "grp_dream", "mv_hotsauce"],
+    "stage_energy": ["stage_sheesh", "mv_sheesh", "mv_drip", "grp_dream"],
+    "statement": ["cov_dangerously", "grp_dream", "mv_sheesh", "mv_drip",
+                  "stage_sheesh", "mv_forever"],
+}
+
+NEED_ENERGY = {"absence_group": "low", "cover": "low", "sheesh": "high",
+               "drip": "high", "hotsauce": "high", "wegoup": "mid",
+               "sitm": "low", "hometown": "low", "studio": "mid",
+               "vocal": "low", "pressure": "low", "momentum": "mid",
+               "stage_energy": "high", "statement": "mid"}
 
 
-def kw_score(scene_text, tags, title):
-    words = set(scene_text.lower().split())
-    hits = 0
-    blob = " ".join(tags) + " " + (title or "")
-    for t in set(blob.lower().replace("'", "").split()):
-        if len(t) >= 3 and (t in words or t in scene_text.lower()):
-            hits += 2
-    for tag in tags:
-        if tag.lower() in scene_text.lower():
-            hits += 2
-    return hits
+def beat_split(narration, T):
+    """Sentence beats with char-proportional time windows."""
+    parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", narration or "")
+             if p.strip()]
+    if not parts:
+        parts = [narration or ""]
+    weights = [max(len(p), 8) for p in parts]
+    total = sum(weights)
+    beats, acc = [], 0.0
+    for p, w in zip(parts, weights):
+        d = T * w / total
+        beats.append({"text": p, "start": round(acc, 2),
+                      "dur": round(d, 2), "need": need_of(p)})
+        acc += d
+    return beats
 
 
-def scene_text_of(sc):
-    return " ".join([sc.get("narration", ""), sc.get("visual_query", ""),
-                     " ".join(sc.get("entities", []) or []),
-                     " ".join(sc.get("places", []) or [])]).strip()
+def need_of(text):
+    t = text.lower()
+    for pat, need in KEYWORDS:
+        if re.search(pat, t):
+            return need
+    return None
 
 
-def candidates_for(sc, index, manifest, k=16, per_key=6):
-    """Keyword-prefiltered candidate shots, best first (keyword is a PRIOR).
-    per_key cap keeps one dominant source from starving scene diversity."""
-    text = scene_text_of(sc)
-    scored = []
-    per_key_n = {}
-    for key, entry in index.items():
-        meta = manifest.get(key) or {}
-        tags = meta.get("subject_tags", [])
-        kw = kw_score(text, tags, meta.get("title", ""))
-        for sh in entry.get("shots", []):
-            if (sh.get("end", 0) - sh.get("start", 0)) < MIN_SHOT:
-                continue
-            fp = sh.get("frame")
-            if not fp or not os.path.isfile(fp):
-                continue
-            if per_key_n.get(key, 0) >= per_key:
-                continue
-            per_key_n[key] = per_key_n.get(key, 0) + 1
-            scored.append({"key": key, "idx": sh["idx"], "start": sh["start"],
-                           "end": sh["end"], "frame": fp, "kw": kw,
-                           "tags": tags, "title": meta.get("title", "")})
-    scored.sort(key=lambda s: (-s["kw"], s["key"], s["idx"]))
-    return scored[:k]
+def load_presence(run_dir):
+    pres_dir = os.path.join(run_dir, "04_media", "presence")
+    pres = {}
+    for f in sorted(os.listdir(pres_dir)):
+        if f.endswith(".json") and not f.endswith(".frames.json"):
+            pres[f[:-5]] = json.load(open(os.path.join(pres_dir, f)))
+    return pres
 
 
-def _vcache_path(run_dir):
-    return os.path.join(run_dir, "04_media", "vision_cache.json")
-
-
-def _vcache_load(run_dir):
-    """Load + migrate: entries saved with the old size-based sig are
-    re-signed from their verdict keys (candidate order = insertion order)."""
-    try:
-        cache = json.load(open(_vcache_path(run_dir)))
-    except Exception:
-        return {}
-    for ck, ent in cache.items():
-        if "verdicts" not in ent or not ent.get("sig"):
-            continue
-        parts = str(ent["sig"]).split("|")
-        # old format: "key:idx:frame_size" (three colon-separated fields)
-        if parts and parts[0].count(":") >= 2:
-            keys = list(ent["verdicts"].keys())
-            if len(keys) >= 8:
-                ent["sig"] = "|".join(keys[:8])
-    return cache
-
-
-def _vcache_save(run_dir, cache):
-    json.dump(cache, open(_vcache_path(run_dir), "w"), indent=1)
-
-
-def vision_score(sc, cands, run_dir):
-    """Score candidates via the vision model (batches of 8).
-    Resumable: per-scene verdicts cached in 04_media/vision_cache.json.
-    The cache signature covers the TOP-8 keyword candidates, so a later run
-    with a smaller candidate budget still hits the cache instead of
-    re-burning vision quota."""
-    text = scene_text_of(sc)
-    intent = sc.get("visual_query") or text[:160]
-    subject = sc.get("subject") or "the documentary subject"
-    cache = _vcache_load(run_dir)
-
-    def sig_of(cl):
-        return "|".join(f"{c['key']}:{c['idx']}" for c in cl[:8])
-
-    ck = f"scene_{sc['id']}"
-    ent = cache.get(ck) or {}
-    if ent.get("sig") == sig_of(cands):
-        vmap = ent["verdicts"]
-        core_ok = all(f"{c['key']}:{c['idx']}" in vmap for c in cands[:8])
-        if core_ok:
-            return [{**c,
-                     "vision": vmap.get(f"{c['key']}:{c['idx']}", [None, ""])[0],
-                     "why": vmap.get(f"{c['key']}:{c['idx']}", [None, ""])[1]}
-                    for c in cands]
-    if os.environ.get("VF_DIRECTOR_SKIP_VISION") == "1":
-        return None                     # caller falls back to keyword-only
+def shots_from_segment(key, seg, need, dur, used_segs, pres_meta, want=1):
+    """Cut 1..n shots from a verified segment, respecting reuse caps and
+    in-point spacing. Deterministic in-point choice."""
     out = []
-    for b in range(0, len(cands), 8):
-        batch = cands[b:b + 8]
-        if not batch:
-            continue
-        prompt = (
-            f"You are the director of a serious K-pop documentary. The narration "
-            f"at this moment says: \"{sc.get('narration', '')[:300]}\" \n"
-            f"Visual intent: {intent}. The primary subject is {subject}.\n"
-            f"You are shown {len(batch)} candidate frames, numbered 1..{len(batch)} "
-            f"in order. Score each frame 0.0-1.0 for how well it supports THIS "
-            f"narration (0.9+ = clearly on-topic and usable; 0.3 = generic; "
-            f"0.0 = wrong subject/wrong event/misleading). Be strict: a frame of "
-            f"the wrong member, wrong song era, or unrelated content must score low. "
-            f"Reply ONLY as JSON: [{{\"n\": <frame number>, \"score\": <0-1>, "
-            f"\"why\": \"<max 12 words>\"}}, ...] for ALL {len(batch)} frames.")
-        rep = vision.ask_json(prompt, [c["frame"] for c in batch], timeout=240)
-        if not isinstance(rep, list):
-            rep = []
-        by_n = {}
-        for e in rep:
-            try:
-                by_n[int(e.get("n"))] = (max(0.0, min(1.0, float(e.get("score", 0)))),
-                                         str(e.get("why", ""))[:80])
-            except (TypeError, ValueError):
+    seg_len = seg["dur"]
+    cap = SEG_REUSE_CAP if key != "cov_dangerously" else 5
+    if used_segs.get((key, seg["start"]), (0, []))[0] >= cap:
+        return out
+    label = pres_meta.get("title", key)[:28] if isinstance(pres_meta, dict)         else str(pres_meta)
+    for i in range(want):
+        use_n, used_ins = used_segs.get((key, seg["start"]), (0, []))
+        if use_n >= cap:
+            break
+        # deterministic in-point SCAN: walk candidate offsets through the
+        # segment; a spot is free only if it differs from every previous
+        # in-point by >2.5s (no repeated frames) and fits the span
+        off = None
+        for j in range(cap * 2 + 1):
+            cand_off = seg_len * 0.12 + j * (dur + 1.5)
+            if cand_off + dur > seg_len - 0.3:
+                cand_off = max(0.0, seg_len - dur - 0.3)
+            if any(abs(cand_off - u) < 2.5 for u in used_ins):
                 continue
-        for i, c in enumerate(batch, 1):
-            vs, why = by_n.get(i, (None, "no vision verdict"))
-            out.append({**c, "vision": vs, "why": why})
-    # R15: only cache COMPLETE verdicts — a rate-limited partial batch must
-    # not poison the cache and skip vision forever.
-    complete = all(c.get("vision") is not None for c in out) and len(out) > 0
-    if complete:
-        verdicts = {f"{c['key']}:{c['idx']}": [c.get("vision"), c.get("why", "")]
-                    for c in out}
-        cache[ck] = {"sig": sig_of(cands), "verdicts": verdicts}
-        _vcache_save(run_dir, cache)
-    import time as _t
-    _t.sleep(45)                     # hard rate limits need long idle windows
+            off = cand_off
+            break
+        if off is None:
+            break
+        src_in = round(seg["start"] + off, 2)
+        d = round(min(dur, seg_len - off - 0.3), 2)
+        if d < MIN_SHOT:
+            break
+        out.append({"key": key, "idx": seg.get("id", -1),
+                    "src_in": src_in, "dur": d,
+                    "src_out": round(src_in + d, 2),
+                    "score": round(0.5 + 0.3 * seg.get("alone_ratio", 0)
+                                   + (0.2 if seg.get("premium") else 0), 3),
+                    "reason": f"{need}: {label} @{src_in:.0f} verified "
+                              f"span (alone {seg.get('alone_ratio', 0):.0%}"
+                              f"{', premium' if seg.get('premium') else ''})"})
+        used_segs[(key, seg["start"])] = (use_n + 1, used_ins + [off])
     return out
 
 
-def select_shots(T, scored, rng_seed=709):
-    """Deterministic selection: score-ranked + source diversity + fill T.
-    Long scenes draw more shots per source (MV cuts are 2-4s); a second
-    replenish pass reuses sources with DIFFERENT shots when the first pass
-    cannot fill the scene."""
-    picks, used_src, total = [], {}, 0.0
-    cap = max(3, round(T / 9))
-
-    def take(cands, cap_src):
-        nonlocal total
-        for c in sorted(cands, key=lambda s: (-_escore(s), s["key"], s["idx"])):
-            if total >= T * 0.94 and picks:
-                return
-            if used_src.get(c["key"], 0) >= cap_src:
+def candidates_for_need(need, pres, used_segs, banned_keys=()):
+    """Verified, selectable spans for a need, best-first."""
+    keys = [k for k in NEED_SOURCES.get(need, []) if k in pres
+            and k not in banned_keys]
+    cands = []
+    for k in keys:
+        meta = pres[k]["meta"]
+        if meta.get("no_ahyeon") and need not in ("absence_group", "pressure",
+                                                  "sitm"):
+            continue          # era-true no-her footage only for those needs
+        for seg in pres[k].get("segments", []):
+            if seg["dur"] < MIN_SHOT + 0.3:
                 continue
-            if picks and picks[-1]["key"] == c["key"] \
-                    and picks[-1]["idx"] == c["idx"]:
+            cap = SEG_REUSE_CAP if k != "cov_dangerously" else 5
+            if used_segs.get((k, seg["start"]), (0, []))[0] >= cap:
                 continue
-            # spread rule: non-adjacent in-points within one source
-            if any(p["key"] == c["key"] and abs(p["src_in"] - (c["start"] + SHOT_PAD)) < 5.0
-                   for p in picks):
-                continue
-            shot_len = c["end"] - c["start"]
-            want = min(max(2.6, T / max(3, 6 - len(picks))), 6.0)
-            dur = min(max(MIN_SHOT, want), shot_len - SHOT_PAD)
-            if dur < MIN_SHOT:
-                continue
-            src_in = round(c["start"] + SHOT_PAD, 2)
-            key_pos = f"{c['key']}:{src_in:.1f}"
-            if any(f"{p['key']}:{p['src_in']:.1f}" == key_pos for p in picks):
-                continue
-            picks.append({"key": c["key"], "idx": c["idx"], "src_in": src_in,
-                          "dur": round(dur, 2),
-                          "src_out": round(src_in + dur, 2),
-                          "keyword": c["kw"],
-                          "vision": c.get("vision"),
-                          "score": round(_escore(c), 3),
-                          "reason": c.get("why") or f"keyword prior {c['kw']}"})
-            used_src[c["key"]] = used_src.get(c["key"], 0) + 1
-            total += dur
-
-    take(scored, cap)
-    if total < T * 0.90:
-        take(scored, cap * 2)          # replenish: long scene, MV-length shots
-    # trim the tail to fit T (last shot shortened, never below MIN_SHOT+0.4)
-    if picks and total > T:
-        over = total - T
-        last = picks[-1]
-        if last["dur"] - over >= MIN_SHOT + 0.4:
-            last["dur"] = round(last["dur"] - over, 2)
-            last["src_out"] = round(last["src_in"] + last["dur"], 2)
-        elif len(picks) > 1:
-            total -= last["dur"]
-            picks.pop()
-    return picks
+            cands.append((k, seg))
+    # rank: premium first, then dedicated sources, then alone_ratio
+    def rank(item):
+        k, seg = item
+        ded = pres[k]["meta"].get("dedicated", False)
+        return (0 if seg.get("premium") else 1,
+                0 if ded else 1,
+                -seg.get("alone_ratio", 0), k, seg["start"])
+    cands.sort(key=rank)
+    return cands
 
 
-def _escore(c):
-    v = c.get("vision")
-    if v is None:
-        return min(c["kw"] / 8.0, 0.5) * 0.7       # keyword-only prior
-    return 0.65 * v + 0.35 * min(c["kw"] / 8.0, 1.0)
+def direct_scene(sc, T, pres, used_segs, tl_start=None):
+    """Build the shot list for one scene from its beats."""
+    beats = beat_split(sc.get("narration", ""), T)
+    default_need = SCENE_DEFAULT.get(sc.get("label", ""), "statement")
+    shots, audit = [], []
+    ded_time = alone_time = 0.0
+    for b in beats:
+        need = b["need"] or default_need
+        want = 1 if b["dur"] < 9 else 2
+        d = min(max(MIN_SHOT, b["dur"] - 0.3), MAX_SHOT)
+        cands = candidates_for_need(need, pres, used_segs)
+        placed = None
+        for k, seg in cands:
+            ss = shots_from_segment(k, seg, need, d, used_segs, pres[k]["meta"],
+                                    want=want)
+            if not ss:
+                continue
+            # no same source twice in a row
+            if shots and ss[0]["key"] == shots[-1]["key"] and len(cands) > 1:
+                alt = [(k2, s2) for k2, s2 in cands if k2 != k]
+                if alt:
+                    k2, s2 = alt[0]
+                    ss = shots_from_segment(k2, s2, need, d, used_segs,
+                                            pres[k2]["meta"], want=want)
+                    if not ss:
+                        continue
+            placed = (need, ss)
+            break
+        if not placed:
+            # widen within the SCENE's own default need (semantic drift guard),
+            # then last-resort dedicated sources
+            for alt_need in dict.fromkeys([default_need, "statement"]):
+                cands2 = candidates_for_need(alt_need, pres, used_segs)
+                for k, seg in cands2:
+                    ss = shots_from_segment(k, seg, alt_need, d, used_segs,
+                                            pres[k]["meta"], want=1)
+                    if ss:
+                        placed = (alt_need + " (fallback)", ss)
+                        break
+                if placed:
+                    break
+        if not placed:
+            audit.append({"beat": b["text"][:80], "problem":
+                          f"no verified footage for need '{need}'"})
+            continue
+        need_used, ss = placed
+        for s in ss:
+            s["beat_start"] = b["start"]
+            s["beat_text"] = b["text"][:90]
+            shots.append(s)
+            meta = pres[s["key"]]["meta"]
+            if meta.get("dedicated"):
+                ded_time += s["dur"]
+            seg = next((g for g in pres[s["key"]].get("segments", [])
+                        if g["start"] <= s["src_in"] <= g["end"]), None)
+            if seg and seg.get("alone_ratio", 0) >= 0.5:
+                alone_time += s["dur"]
+    return shots, beats, audit, ded_time, alone_time
 
 
 def run(run_dir):
     media = os.path.join(run_dir, "04_media")
-    index = json.load(open(os.path.join(media, "shot_index.json")))
-    manifest = json.load(open(os.path.join(media, "pool", "manifest.json")))
+    pres = load_presence(run_dir)
+    if not pres:
+        raise RuntimeError("DIRECTOR v2: no presence maps — run "
+                           "scripts/build_presence.py first (no shortcuts)")
     plan = json.load(open(os.path.join(run_dir, "02_script.json")))
     scenes = plan.get("scenes") or [s for seg in plan.get("segments", [])
                                     for s in seg["scenes"]]
     timings = {t["id"]: t["audio"] for t in
-               json.load(open(os.path.join(run_dir, "03_timings.json")))["timings"]}
+               json.load(open(os.path.join(run_dir, "03_timings.json")))
+               ["timings"]}
     tl_starts = {}
     try:
         tl = json.load(open(os.path.join(run_dir, "06_timeline.json")))
@@ -253,62 +296,110 @@ def run(run_dir):
     except Exception:
         pass
 
+    used_segs = {}
     edl, review = [], []
+    tot = ded_t = alone_t = 0.0
     for sc in scenes:
         T = max(3.5, timings.get(sc["id"], 4.0) + 0.8)
-        text = scene_text_of(sc)
-        # VF_DIRECTOR_MAXK: rate-limit-aware candidate budget (default full)
-        maxk = int(os.environ.get("VF_DIRECTOR_MAXK", "32"))
-        k = min(maxk, 32 if T > 25 else 16)
-        cands = candidates_for(sc, index, manifest, k=k,
-                               per_key=12 if T > 25 else 6)
-        if not cands:
+        shots, beats, audit, ded, alone = direct_scene(sc, T, pres, used_segs,
+                                                       tl_starts.get(sc["id"]))
+        if not shots:
             raise RuntimeError(
-                f"DIRECTOR: scene {sc['id']} has zero candidate shots — "
-                f"pool cannot support the narration (build fails honestly)")
-        scored = vision_score(sc, cands, run_dir)
-        if scored is None:
-            # explicit keyword-only fallback (honest review-queue flags);
-            # vision re-scoring can be re-run later — fingerprints invalidate
-            # downstream renders automatically
-            scored = [dict(c, vision=None, why="keyword fallback (vision "
-                           "unavailable this run)") for c in cands]
-        best_v = max([c["vision"] or 0 for c in scored] or [0])
-        best_e = max([_escore(c) for c in scored] or [0])
-        picks = select_shots(T, scored)
+                f"DIRECTOR v2: scene {sc['id']} ({sc.get('label')}) has no "
+                f"usable verified footage — build fails honestly")
+        tot += sum(s["dur"] for s in shots)
+        ded_t += ded
+        alone_t += alone
         entry = {"id": sc["id"], "label": sc.get("label", ""),
-                 "narration_excerpt": sc.get("narration", "")[:220],
-                 "intent": sc.get("visual_query", text[:160]),
+                 "narration_excerpt": sc.get("narration", "")[:200],
+                 "intent": beats[0]["need"] if beats else "",
                  "timeline_start": tl_starts.get(sc["id"]),
-                 "scene_dur": T, "shots": picks,
-                 "best_vision": round(best_v, 3), "best_score": round(best_e, 3),
-                 "gaps": []}
-        if not picks:
-            raise RuntimeError(
-                f"DIRECTOR: scene {sc['id']} produced no usable shots")
-        if best_e < BEST_OK or best_v < BEST_OK:
-            entry["gaps"].append("weak relevance — flagged for review")
-            review.append({"id": sc["id"], "best_vision": round(best_v, 3),
-                           "best_score": round(best_e, 3),
-                           "narration_excerpt": entry["narration_excerpt"]})
-            print(f"[director] scene {sc['id']:>2}: WEAK (vision {best_v:.2f}) "
-                  f"-> review queue", flush=True)
-        # place/context stills (imgagent hook — inserted by s4 if available)
-        if sc.get("places"):
-            entry["places"] = sc["places"]
+                 "scene_dur": T, "shots": shots, "beats": [
+                     {"text": b["text"][:100], "start": b["start"],
+                      "dur": b["dur"], "need": b["need"] or
+                      SCENE_DEFAULT.get(sc.get("label", ""), "statement")}
+                     for b in beats],
+                 "gaps": [a["problem"] for a in audit]}
+        if audit:
+            review.append({"id": sc["id"], "label": sc.get("label"),
+                           "problems": [a["problem"] for a in audit]})
         edl.append(entry)
-        tops = ", ".join(f"{p['key']}@{p['src_in']:.0f}({p['score']:.2f})"
-                         for p in picks[:3])
-        print(f"[director] scene {sc['id']:>2}: {len(picks)} shots "
-              f"[{tops}] vision {best_v:.2f}", flush=True)
+        tops = ", ".join(f"{s['key']}@{s['src_in']:.0f}" for s in shots[:4])
+        print(f"[director-v2] scene {sc['id']:>2} {sc.get('label','')[:22]:22s}: "
+              f"{len(shots)} shots [{tops}]", flush=True)
 
-    json.dump({"version": "director-v1", "scenes": edl},
+    # ---- quota repair: enforce the dedicated-source floor by REPLACING the
+    # least group-specific shots with dedicated (cover/studio) footage.
+    # The cover performance is the film's musical anchor; grp_dream is the
+    # studio/training anchor. Both are 100% Ahyeon.
+    def is_ded(k, sh=None):
+        if pres[k]["meta"].get("dedicated", False):
+            return True
+        if sh is not None:
+            seg = next((g for g in pres[k].get("segments", [])
+                        if g["start"] <= sh["src_in"] <= g["end"]), None)
+            if seg and seg.get("alone_ratio", 0) >= 0.5:
+                return True
+        return False
+
+    def try_replace(entry, si):
+        shots = entry["shots"]
+        if si > 0 and shots[si - 1]["key"] == "cov_dangerously":
+            return False
+        if si + 1 < len(shots) and shots[si + 1]["key"] == "cov_dangerously":
+            return False
+        d = shots[si]["dur"]
+        for k, seg in candidates_for_need("cover", pres, used_segs):
+            ss = shots_from_segment(k, seg, "cover", d, used_segs,
+                                    pres[k]["meta"], want=1)
+            if ss:
+                old = shots[si]
+                ss[0]["beat_text"] = old.get("beat_text", "")
+                ss[0]["beat_start"] = old.get("beat_start", 0)
+                shots[si] = ss[0]
+                return True
+        return False
+
+    for _round in range(24):
+        ded_t = sum(s["dur"] for e in edl for s in e["shots"]
+                    if is_ded(s["key"], s))
+        tot = sum(s["dur"] for e in edl for s in e["shots"])
+        if tot and ded_t / tot >= DEDICATED_FLOOR:
+            break
+        # replace the largest non-dedicated shot that sits in a
+        # statement/momentum/hometown/studio/vocal beat (weakest group tie)
+        best = None
+        for e in edl:
+            for si, sh in enumerate(e["shots"]):
+                if is_ded(sh["key"]) or e["label"] in ("the absence",):
+                    continue
+                bt = (sh.get("beat_text") or "").lower()
+                if re.search(r"batter|sheesh|drip|hot sauce|we go up|"
+                             r"stuck|debut stage|arena|dome", bt):
+                    continue          # era-anchored shots stay
+                if best is None or sh["dur"] > best[0]["dur"]:
+                    best = (sh, e, si)
+        if best is None:
+            break
+        _, e, si = best
+        if not try_replace(e, si):
+            break
+    ded_share = ded_t / max(tot, 1)
+    alone_share = alone_t / max(tot, 1)
+    print(f"[director-v2] dedicated share {ded_share:.0%} (floor "
+          f"{DEDICATED_FLOOR:.0%}), alone share {alone_share:.0%} (floor "
+          f"{ALONE_FLOOR:.0%})", flush=True)
+    json.dump({"version": "director-v2", "dedicated_share": round(ded_share, 3),
+               "alone_share": round(alone_share, 3), "scenes": edl},
               open(os.path.join(media, "plan.json"), "w"), indent=1)
-    json.dump({"generated_for": os.path.basename(run_dir.rstrip('/')),
+    json.dump({"generated_for": os.path.basename(run_dir.rstrip("/")),
+               "policy": {"dedicated_floor": DEDICATED_FLOOR,
+                          "alone_floor": ALONE_FLOOR},
                "review": review},
               open(os.path.join(media, "review_queue.json"), "w"), indent=1)
-    print(f"[director] plan.json written: {len(edl)} scenes, "
-          f"{len(review)} flagged for review", flush=True)
+    print(f"[director-v2] plan.json: {len(edl)} scenes, "
+          f"{sum(len(e['shots']) for e in edl)} shots, {len(review)} scenes "
+          f"with gaps", flush=True)
     return edl
 
 
