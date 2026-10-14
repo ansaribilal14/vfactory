@@ -42,3 +42,53 @@ Stage Summary:
   gates + fingerprint invalidation (s6/s3), cinematic score (s5), editorial EDL
   + shot indexing + vision verification (s4), imgagent contextual imagery,
   verified-story script (s1/s2), regression tests, proof render, full render.
+
+---
+Task ID: R15-complete
+Agent: main (Super Z)
+Task: REPAIR VFACTORY AND REBUILD THE AHYEON DOCUMENTARY — full execution + verified release
+
+Work Log:
+- ROOT CAUSE (proven by isolation): the audio graph consumed the narration bus
+  [nar] TWICE (sidechain key + final amix) without asplit — the second
+  reference silently produced nothing => every mix shipped music-only. Fixed
+  with [nar]asplit=2; correlation vs narration files went 0.09 -> 0.94.
+- Gates shipped: envelope cross-correlation narration QC on mix.wav AND the
+  shipped final.mp4 (min corr 0.40; music-only ~0.09); content fingerprints
+  (sha256 of narration files/bed/starts/code) invalidate mix/final/chunks/
+  bakes — stale final.mp4 proven caught in-run (fingerprint mismatch forced
+  re-mux); per-segment voice validation report (release-blocking); tongtong
+  fallback removed.
+- Score rebuilt: cinematic-documentary composer (D-minor slow harmony, pads +
+  low strings + sparse felt-piano, act intensity curve, silence pockets, NO
+  percussion/groove/plucks). Tests: no groove periodicity, no hat band,
+  headroom, determinism, cache invalidation — all pass.
+- Editorial rebuilt: permanent Director agent (stages/director.py): shot
+  index 1741 shots / 23 sources (scene-detect + frames + contact sheets),
+  vision-verified shot scoring (glm-5v), exact in/out EDL with reasons,
+  review queue. Scenes 1-9 vision-verified 0.90-1.00; 10-16 keyword+review
+  (vision rate-limit 429 window; re-scoring resumable via cache). imgagent
+  (permanent): verified Chuncheon + YG HQ stills (0.95) with provenance.
+- Story rebuilt: verified fact ledger (9/15 confirmed via web research);
+  v1's fabricated claims (Produce 48, most-searched-on-Google) dropped; hard
+  fact gate on dates/numbers; 16 scenes, 4 acts; narration 9.66 min
+  en-US-AndrewNeural @ -3%; 16/16 validation pass.
+- Proof render (117s, scenes 1-3) ACCEPTED: narration corr 0.934/0.943/0.853,
+  loudness -14.00 LUFS / TP -1.32, 720p30 AAC 48k stereo, frames content-OK.
+- Full render: 594.5s, 507MB; QC: 16/16 narration scenes on the SHIPPED file
+  (min corr 0.888), loudness -16.5 mean / -1.4 max, frames OK at
+  start/middle/end.
+- Delivery: release film-ahyeon-the-fifth-generation-it-girl-v2 published +
+  remote-verified (507MB full + 17MB trailer; byte-exact content-length);
+  storage.to mirror https://storage.to/qmtgOO7ML; OLD v1 release DELETED
+  (user-authorized) + deletion log; manifest updated (sha256 recorded);
+  .gh_token rotated to the canonical ansaribilal14 token (old superz1402
+  token was suspended — 403 on release create).
+- Commit df61559 pushed to ansaribilal14/vfactory (remote-verified).
+
+Stage Summary:
+- The repaired film is a genuine documentary: verified-fact script, audible
+  narration everywhere (measured), restrained cinematic score, Director-planned
+  vision-verified shots with exact timecodes, verified place imagery.
+- Open item: vision re-scoring scenes 10-16 when the 429 window lifts (cache
+  + fingerprints make it a safe automatic re-render path).

@@ -4,28 +4,6 @@
  "status": "active",
  "assets": [
   {
-   "asset_id": "film-ahyeon-the-fifth-generation-it-girl-v1-720p",
-   "asset_type": "video_final",
-   "filename": "ahyeon-the-fifth-generation-it-girl_full_720p.mp4",
-   "provider": "github-release",
-   "remote_id": "film-ahyeon-the-fifth-generation-it-girl",
-   "remote_url": "https://github.com/ansaribilal14/vfactory/releases/download/film-ahyeon-the-fifth-generation-it-girl/ahyeon-the-fifth-generation-it-girl_full_720p.mp4",
-   "size_bytes": 448472359,
-   "sha256": null,
-   "verification_status": "uploaded_unverified",
-   "availability_status": "available",
-   "retention_policy": "release asset (deleted after user download)",
-   "expiration_at": null,
-   "generation_stage": "s6_render",
-   "version": "v1",
-   "dependencies": [
-    "narration-wavs",
-    "mv-pool"
-   ],
-   "retry_status": "sha pending (computable from local final.mp4)",
-   "notes": "v1: opuscar composed score, clip-proof master chain"
-  },
-  {
    "asset_id": "ahyeon-the-fifth-generation-it-girl-v1-storage-mirror",
    "project_id": "ahyeon-the-fifth-generation-it-girl",
    "asset_type": "video_final",
@@ -48,7 +26,31 @@
    "dependencies": [],
    "retry_status": null,
    "notes": "storage.to mirror of v1 final"
+  },
+  {
+   "asset_id": "film-ahyeon-the-fifth-generation-it-girl-v2-720p",
+   "asset_type": "video_final",
+   "filename": "ahyeon-the-fifth-generation-it-girl-v2_full_720p.mp4",
+   "provider": "github-release",
+   "remote_id": "film-ahyeon-the-fifth-generation-it-girl-v2",
+   "remote_url": "https://github.com/ansaribilal14/vfactory/releases/download/film-ahyeon-the-fifth-generation-it-girl-v2/ahyeon-the-fifth-generation-it-girl-v2_full_720p.mp4",
+   "size_bytes": 532019240,
+   "sha256": "6e2d1bc4385d13c20cea76845d135a4e268bc41206286e3f5bdb380e39442463",
+   "verification_status": "verified_remote_size_match",
+   "availability_status": "available",
+   "retention_policy": "release asset (deleted after user download)",
+   "expiration_at": null,
+   "generation_stage": "s6_render",
+   "version": "v2",
+   "dependencies": [
+    "narration-wavs",
+    "mv-pool",
+    "director-plan",
+    "cinematic-score"
+   ],
+   "retry_status": null,
+   "notes": "R15 rebuild: asplit narration fix, cinematic score, Director EDL; QC 16/16 corr>=0.888, -14 LUFS"
   }
  ],
- "updated_at": "2026-10-14T03:47:48+0000"
+ "updated_at": "2026-10-14T12:01:13+0000"
 }

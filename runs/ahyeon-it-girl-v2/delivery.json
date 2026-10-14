@@ -1,0 +1,31 @@
+{
+ "file": "runs/ahyeon-it-girl-v2/final.mp4",
+ "size_mb": 507.4,
+ "chat_id": "1263089875",
+ "release": {
+  "tag": "film-ahyeon-the-fifth-generation-it-girl-v2",
+  "repo": "ansaribilal14/vfactory",
+  "assets": {},
+  "ok": true,
+  "html_url": "https://github.com/ansaribilal14/vfactory/releases/tag/film-ahyeon-the-fifth-generation-it-girl-v2",
+  "urls": {
+   "ahyeon-the-fifth-generation-it-girl-v2_full_720p.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-ahyeon-the-fifth-generation-it-girl-v2/ahyeon-the-fifth-generation-it-girl-v2_full_720p.mp4",
+   "ahyeon-the-fifth-generation-it-girl-v2_trailer.mp4": "https://github.com/ansaribilal14/vfactory/releases/download/film-ahyeon-the-fifth-generation-it-girl-v2/ahyeon-the-fifth-generation-it-girl-v2_trailer.mp4"
+  },
+  "tg_ok": false,
+  "tg_error": "[Errno 2] No such file or directory: '/home/z/my-project/.tg_token'",
+  "slug": "ahyeon-the-fifth-generation-it-girl-v2"
+ },
+ "persist": {
+  "ok": true,
+  "state": "persisted",
+  "url": "https://storage.to/qmtgOO7ML"
+ },
+ "method": "storageto",
+ "ok": true,
+ "url": "https://storage.to/qmtgOO7ML",
+ "id": null,
+ "expires_at": null,
+ "tg_error": "[Errno 2] No such file or directory: '/home/z/my-project/.tg_token'",
+ "delivered": true
+}
